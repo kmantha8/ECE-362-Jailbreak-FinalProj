@@ -1,0 +1,7 @@
+.program matrix_pio
+.side_set 1
+
+    pull block side 0   ; Pull data from FIFO
+loop:
+    out pins, 6 side 0  ; Shift 6 bits to pins
+    jmp loop    side 1  ; Pulse Clock (side 1)
