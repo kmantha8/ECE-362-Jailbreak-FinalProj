@@ -8,11 +8,22 @@
 #define HEIGHT 32
 
 // Update these to match your wiring
-#define DATA_BASE_PIN 0  // R1, G1, B1, R2, G2, B2 pins starting here
-#define CLK_PIN 6
-#define LAT_PIN 7
-#define OE_PIN 8
-#define ADDR_BASE_PIN 9 // A, B, C, D address pins
+// RP2350 GPIO Mapping based on your list
+#define R1_PIN 1
+#define G1_PIN 2
+#define B1_PIN 3
+#define R2_PIN 4
+#define G2_PIN 5
+#define B2_PIN 6
+
+#define ADDR_A 7
+#define ADDR_B 8
+#define ADDR_C 9
+#define ADDR_D 10
+
+#define CLK_PIN 11
+#define LAT_PIN 12
+#define OE_PIN  13
 
 // Framebuffer: 32 rows, each row has 64 pixels. 
 // Standard HUB75 drives two halves (0-15 and 16-31) simultaneously.
