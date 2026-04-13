@@ -1,0 +1,8 @@
+.program hub75
+.side_set 1 opt
+
+; Shifts out 24 bits (RGB data for two rows simultaneously)
+; and toggles the clock pin.
+pull block          side 0
+out pins, 6         side 0 [1]
+nop                 side 1 [1]
