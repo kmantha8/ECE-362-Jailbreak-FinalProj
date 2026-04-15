@@ -515,9 +515,11 @@
 #define BLACK 0b000000
 
 //static positions
-int bx = 16;
-int by = 32; // Centered vertically
-int radius_sq = 9;
+float bx = 16.0f;
+float by = 32.0f; // Centered vertically'
+float ball_dx = 0.2f; //horixonal speed
+float ball_dy = 0.2f; //verifucal speed
+int radius_sq = 5;
 
 int paddle_x = 8;
 int paddle_y = 2; // Near the bottom
@@ -675,8 +677,8 @@ int main() {
         //     target_col = (target_col + 1) % 64;
         // }
         //ball physics
-        bx += 1;
-        by += 1;
+        bx += ball_dx;
+        by += ball_dy;
 
         // if (by == target_col)
         // {
@@ -686,13 +688,15 @@ int main() {
         //bound off side of walls rows 0 and 31
         if (bx <= 0 || bx >= 31)
         {
-            bx += -1;
+            //revserve the speed of the ball so
+            //that it continus on in that direction
+            ball_dx *= -1;
         }
 
         //bound of top 
         if (by >= 63 || by <= 0)
         {
-            by += -1;
+            ball_dy *= -1;
         }
 
         //bound off the paddle
@@ -710,7 +714,15 @@ int main() {
             (paddle_x <= bx) && 
             (bx <= (paddle_width + paddle_x)))
         {
-            by += 1;
+            ball_dy *= -1;
+        }
+
+        if (by <= 1)
+        {
+            bx = 16.0f;
+            by = 32.0f; // Centered vertically'
+            ball_dx = -0.2f; //horixonal speed
+            ball_dy = 0.2f; //verifucal speed
         }
 
         for (int row = 0; row < 16; row++) {
