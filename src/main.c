@@ -519,7 +519,7 @@ float bx = 16.0f;
 float by = 32.0f; // Centered vertically'
 float ball_dx = 0.2f; //horixonal speed
 float ball_dy = 0.2f; //verifucal speed
-int radius_sq = 5;
+int radius_sq = 4;
 
 int paddle_x = 8;
 int paddle_y = 2; // Near the bottom
@@ -579,11 +579,16 @@ uint32_t ball_paddle(int col, int row) {
                 (col < (paddle_x + paddle_width)) 
                 ));
 
+    //having trouble with glitchy edges
+    //convert all to int
+    int int_bx = (int)bx;
+    int int_by = (int)by;
+
     //calculate horixonal ditance from current pixel (x) to center of ball
     //do pythagoram theorm (a^2 + b^2 = c^2)
-    int a = col - bx;
+    int a = col - int_bx;
     //find veritcal disntace to ball center
-    int b = (row + 1) - by;
+    int b = (row + 1) - int_by;
 
     //circle equation 
     //a^2 + b^2 < radius ^ 2
@@ -680,13 +685,17 @@ int main() {
         bx += ball_dx;
         by += ball_dy;
 
+        int int_bx = (int)bx;
+        int int_by = (int)by;
+
         // if (by == target_col)
         // {
         //     by += -1;
         // }
 
         //bound off side of walls rows 0 and 31
-        if (bx <= 0 || bx >= 31)
+        //take into account radius of 2
+        if (int_bx <= 2 || int_bx >= 29)
         {
             //revserve the speed of the ball so
             //that it continus on in that direction
@@ -694,7 +703,7 @@ int main() {
         }
 
         //bound of top 
-        if (by >= 63 || by <= 0)
+        if (int_by >= 61 || int_by <= 2)
         {
             ball_dy *= -1;
         }
@@ -709,15 +718,18 @@ int main() {
         // int by = 32; // Centered vertically
         // int radius_sq = 9;
         
-        if ((paddle_y <= by) && 
-            (by <= (paddle_y + paddle_height)) && 
-            (paddle_x <= bx) && 
-            (bx <= (paddle_width + paddle_x)))
+        if (((paddle_y - 2) <= int_by) && 
+            (int_by <= (paddle_y + paddle_height + 2)) && 
+            ((paddle_x - 2) <= int_bx) && 
+            (int_bx <= (paddle_width + paddle_x + 2)))
         {
             ball_dy *= -1;
+            //ball gets stuck rolling on paddle
+            //have to move it off
+            by += 0.2f;
         }
 
-        if (by <= 1)
+        if (int_by < (paddle_y - 1))
         {
             bx = 16.0f;
             by = 32.0f; // Centered vertically'
