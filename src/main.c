@@ -359,7 +359,145 @@
 
 //////////////////////////////////////////////////////////
 // WHITE CIRCLE
-// /////////////////////////////////////////////////////////
+// // // /////////////////////////////////////////////////////////
+// #include <stdio.h>
+// #include "pico/stdlib.h"
+// #include "hardware/pio.h"
+// #include "hardware/gpio.h"
+// #include "matrix.pio.h"
+
+// //Pin mapping
+// #define DATA_BASE_PIN 1 
+// #define ADDR_BASE_PIN 7 
+// #define CLK_PIN 11
+// #define LAT_PIN 12
+// #define OE_PIN 13
+
+// #define WHITE 0b111111 
+// #define BLACK 0b000000
+
+// void setup_pio(PIO pio, uint sm, uint offset) {
+//     //lead default configuration for led matrix
+//     pio_sm_config c = matrix_pio_program_get_default_config(offset);
+//     //define 6 data pins as out for RGB data
+//     sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+//     //define clk find as the side-set pins to toggle automattically
+//     sm_config_set_sideset_pins(&c, CLK_PIN);
+    
+//     //initlaize gpio for pio use
+//     for (int i = 0; i < 6; i++) 
+//     {
+//         pio_gpio_init(pio, DATA_BASE_PIN + i);
+//     }
+//     pio_gpio_init(pio, CLK_PIN);
+    
+//     //set direction of pin to output in statemachine
+//     pio_sm_set_consecutive_pindirs(pio, sm, DATA_BASE_PIN, 6, true);
+//     pio_sm_set_consecutive_pindirs(pio, sm, CLK_PIN, 1, true);
+    
+//     //shift out 24 bits at a time, shift right
+//     // 24-bit packing (4 pixels * 6 bits)
+//     sm_config_set_out_shift(&c, true, true, 24); 
+//     //set clk divider
+//     sm_config_set_clkdiv(&c, 20.0f); 
+    
+//     //apply configuration and enable state machien
+//     pio_sm_init(pio, sm, offset, &c);
+//     pio_sm_set_enabled(pio, sm, true);
+// }
+
+// uint32_t get_clean_circle(int x, int row) {
+//     //center of circles x and y
+//     int cx = 32;
+//     int cy = 16;
+//     //easier calcuation (12^2)
+//     int radius_sq = 144;
+
+//     //calculate distance fro top half (rows 0-15)
+//     int dx = x - cx;
+//     int dy1 = row - cy;
+//     int dist1 = (dx * dx) + (dy1 * dy1);
+//     //if distance < radius 
+//     //set rbg to white or else black
+//     uint32_t top = (dist1 < radius_sq) ? 0b111 : 0b000;
+
+//     //calculate distance fro top half (rows 16-31)
+//     int dy2 = (row + 16) - cy;
+//     int dist2 = (dx * dx) + (dy2 * dy2);
+//     //same thing
+//     uint32_t bottom = (dist2 < radius_sq) ? 0b111 : 0b000;
+
+//     //combine bottom (upper 3 bits) and top (lower 3 bits)
+//     //into 6-bit pixal data
+//     return (bottom << 3) | top;
+// }
+
+
+
+// int main() {
+//     stdio_init_all();
+
+//     for(int i = 7; i <= 13; i++) {
+//         //set adress pins
+//         gpio_init(i);
+//         //set as output
+//         gpio_set_dir(i, GPIO_OUT);
+//         //high current for LEDS
+//         gpio_set_drive_strength(i, GPIO_DRIVE_STRENGTH_12MA);
+//     }
+
+//     //use first PIO block
+//     PIO pio = pio0;
+//     //load asm into pio memory
+//     uint offset = pio_add_program(pio, &matrix_pio_program);
+//     //find an aviable state machine
+//     uint sm = pio_claim_unused_sm(pio, true);
+//     //run conifguration
+//     setup_pio(pio, sm, offset);
+
+//     while (true) {
+//         for (int row = 0; row < 16; row++) {
+//             //disable display to prevent ghosting while swittching rows
+//             gpio_put(OE_PIN, 1); 
+
+//             // Set Address Pins (A, B, C, D)
+//             //to select row
+//             gpio_put_masked(0xF << ADDR_BASE_PIN, row << ADDR_BASE_PIN);
+
+//             // Shift in 64 pixels (16 words of 4 pixels)
+//             for (int i = 0; i < 16; i++) {
+//                 uint32_t packed_word = 0;
+//                 for (int p = 0; p < 4; p++) {
+//                     int col = (i * 4) + p;
+//                     //get color for the specific coordinate
+//                     uint32_t mask = get_clean_circle(col, row);
+//                     //pack 6-bit color into 32-bit word for PIO
+//                     packed_word |= (mask << (p * 6));
+//                 }
+//                 //send 4-pixel workd to pio fifo
+//                 pio_sm_put_blocking(pio, sm, packed_word);
+//             }
+
+//             //wait for shifting in the bits
+//             while (!pio_sm_is_tx_fifo_empty(pio, sm));
+            
+//             //puslse the latch to move shifted data to led driver
+//             gpio_put(LAT_PIN, 1);
+//             busy_wait_us(1); 
+//             gpio_put(LAT_PIN, 0);
+            
+//             //enable display and wait so leds hvae time to light up
+//             gpio_put(OE_PIN, 0);
+//             busy_wait_us(200); 
+//         }
+//     }
+// }
+
+
+///////////////////////////////////////////////////
+// Ball and paddle
+//////////////////////////////////////////////
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
@@ -375,6 +513,16 @@
 
 #define WHITE 0b111111 
 #define BLACK 0b000000
+
+//static positions
+int bx = 16;
+int by = 32; // Centered vertically
+int radius_sq = 9;
+
+int paddle_x = 8;
+int paddle_y = 2; // Near the bottom
+int paddle_width = 16;
+int paddle_height = 2;
 
 void setup_pio(PIO pio, uint sm, uint offset) {
     //lead default configuration for led matrix
@@ -406,33 +554,73 @@ void setup_pio(PIO pio, uint sm, uint offset) {
     pio_sm_set_enabled(pio, sm, true);
 }
 
-uint32_t get_clean_circle(int x, int row) {
-    //center of circles x and y
-    int cx = 32;
-    int cy = 16;
-    //easier calcuation (12^2)
-    int radius_sq = 144;
+uint32_t ball_paddle(int col, int row) {
 
-    //calculate distance fro top half (rows 0-15)
-    int dx = x - cx;
-    int dy1 = row - cy;
-    int dist1 = (dx * dx) + (dy1 * dy1);
-    //if distance < radius 
-    //set rbg to white or else black
-    uint32_t top = (dist1 < radius_sq) ? 0b111 : 0b000;
+    //is the pixel greater than the starting point of the paddle
+    //and is the pixel less than (paddle start + width)
+    //esssentially asking if it is supposed to be on the padle line
+    //checks to see if the row is also the 31 row can make bigger is need be
+    // int paddle = ((col >= paddle_x) && 
+    //             (col < (paddle_x + paddle_width)) 
+    //             && ((row + 16) == 29));
 
-    //calculate distance fro top half (rows 16-31)
-    int dy2 = (row + 16) - cy;
-    int dist2 = (dx * dx) + (dy2 * dy2);
-    //same thing
-    uint32_t bottom = (dist2 < radius_sq) ? 0b111 : 0b000;
+    //check top half (1-15)
+    bool paddle = ((row >= paddle_y) && 
+                (row < (paddle_y + paddle_height)) &&
+                ((col >= paddle_x) && 
+                (col < (paddle_x + paddle_width)) 
+                ));
 
-    //combine bottom (upper 3 bits) and top (lower 3 bits)
-    //into 6-bit pixal data
-    return (bottom << 3) | top;
+    //calculate horixonal ditance from current pixel (x) to center of ball
+    //do pythagoram theorm (a^2 + b^2 = c^2)
+    int a = col - bx;
+    //find veritcal disntace to ball center
+    int b = (row + 1) - by;
+
+    //circle equation 
+    //a^2 + b^2 < radius ^ 2
+    //then the pixel is part of ball = true
+    bool ball = ((a * a) + (b * b)) < radius_sq;
+
+    //split into two in additional function 
+    //because habe to scan for top and bottom already
+    //easier ot compelte in a seprate function
+
+    //convert the boolean into 3-bit format
+    //if it is a part of the ball then it is white (1) else off
+    // uint32_t ball_top = (ball || paddle_top) ? 0b100 : 0b000;
+    // uint32_t ball_top = (ball) ? 0b100 : 0b000;
+    // uint32_t paddle_top = (paddle1) ? 0b100 : 0b000;
+    // uint32_t bits_top = ball_top | paddle_top;
+    // //same thing for bottom
+    // //the paddle will also show up on the bottom rows though
+    // //so or with paddle
+    // // uint32_t ball_bot = (ball2 || paddle_bot) ? 0b001 : 0b000;
+    // uint32_t ball_bot = (ball2) ? 0b001 : 0b000;
+    // uint32_t paddle_bot = (paddle2) ? 0b001 : 0b000;
+    // uint32_t bits_bottom = ball_bot | paddle_bot;
+
+    //hub75 expects 6 bits in the order [b2 g2 r2 b1 g1 r1]
+    //shift bottom bits into first three them with top bits
+    // uint32_t bits_return = (bits_bottom << 3) | bits_top;
+    uint32_t bits_ball = ball ? 0b001 : 0b000;
+    uint32_t bits_paddle = paddle ? 0b100 : 0b000;
+
+    // uint32_t bits_return = bits_ball | bits_paddle;
+
+    return bits_ball | bits_paddle;
 }
 
-
+//easier to scan rows so dont have to it in additional functions
+uint32_t get_data(int phys_col, int phys_row) {
+    // We swap row/col here to match the verical orientation
+    uint32_t top = ball_paddle(phys_row, phys_col);
+    
+    // Row 16-31 just add 16 to rows
+    uint32_t bottom = ball_paddle(phys_row + 16, phys_col);
+    
+    return (bottom << 3) | top;
+}
 
 int main() {
     stdio_init_all();
@@ -470,7 +658,10 @@ int main() {
                 for (int p = 0; p < 4; p++) {
                     int col = (i * 4) + p;
                     //get color for the specific coordinate
-                    uint32_t mask = get_clean_circle(col, row);
+                    uint32_t mask = get_data(col, row);
+
+                    //ensure mask is only 6 bits
+                    mask &= 0x3F;
                     //pack 6-bit color into 32-bit word for PIO
                     packed_word |= (mask << (p * 6));
                 }
@@ -492,3 +683,5 @@ int main() {
         }
     }
 }
+
+
