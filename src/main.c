@@ -593,7 +593,7 @@ uint32_t ball_paddle(int col, int row) {
     //circle equation 
     //a^2 + b^2 < radius ^ 2
     //then the pixel is part of ball = true
-    bool ball = ((a * a) + (b * b)) < radius_sq;
+    bool ball = (((a * a) + (b * b))) < radius_sq;
 
     //split into two in additional function 
     //because habe to scan for top and bottom already
@@ -703,7 +703,7 @@ int main() {
         }
 
         //bound of top 
-        if (int_by >= 61 || int_by <= 2)
+        if (int_by >= 61)
         {
             ball_dy *= -1;
         }
@@ -729,7 +729,7 @@ int main() {
             by += 0.2f;
         }
 
-        if (int_by < (paddle_y - 1))
+        if (int_by < (paddle_y))
         {
             bx = 16.0f;
             by = 32.0f; // Centered vertically'
@@ -772,6 +772,13 @@ int main() {
 
             //wait for shifting in the bits
             while (!pio_sm_is_tx_fifo_empty(pio, sm));
+            //having trouble waiting
+            //it is glithcing out a lot
+            //adding an additional wait to give it time to process
+            busy_wait_us(2); 
+            gpio_put(LAT_PIN, 1);
+            busy_wait_us(1);
+            gpio_put(LAT_PIN, 0);
             
             //puslse the latch to move shifted data to led driver
             gpio_put(LAT_PIN, 1);
