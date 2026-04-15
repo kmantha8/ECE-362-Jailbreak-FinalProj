@@ -1,7 +1,13 @@
 .program matrix_pio
-.side_set 1
+.side_set 1      ; reserve 1 bit for clk pin (will toggle)
 
-    pull block side 0   ; Pull data from FIFO
-loop:
-    out pins, 6 side 0  ; Shift 6 bits to pins
-    jmp loop    side 1  ; Pulse Clock (side 1)
+;starting point of program
+public entry_point:
+    ;out pins, 6 : take 6 bits from Shift Reg and put them in GPIO 1-6
+    ;side 0 :  set clk pin to 0
+    out pins, 6        side 0 
+
+    ; nop : do nothing for one cucle
+    ;side 1 : set clk pin to high
+    ; rising edge tells led matrix to grab 6 bits
+    nop                side 1

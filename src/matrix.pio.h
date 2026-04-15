@@ -13,21 +13,22 @@
 // ---------- //
 
 #define matrix_pio_wrap_target 0
-#define matrix_pio_wrap 2
+#define matrix_pio_wrap 1
 #define matrix_pio_pio_version 0
+
+#define matrix_pio_offset_entry_point 0u
 
 static const uint16_t matrix_pio_program_instructions[] = {
             //     .wrap_target
-    0x80a0, //  0: pull   block           side 0
-    0x6006, //  1: out    pins, 6         side 0
-    0x1001, //  2: jmp    1               side 1
+    0x6006, //  0: out    pins, 6         side 0
+    0xb042, //  1: nop                    side 1
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program matrix_pio_program = {
     .instructions = matrix_pio_program_instructions,
-    .length = 3,
+    .length = 2,
     .origin = -1,
     .pio_version = matrix_pio_pio_version,
 #if PICO_PIO_VERSION > 0
