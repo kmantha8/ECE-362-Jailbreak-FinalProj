@@ -524,6 +524,12 @@ int paddle_y = 2; // Near the bottom
 int paddle_width = 16;
 int paddle_height = 2;
 
+//initaial move varibles for moving line
+//i think need in other things
+int target_col = 0;
+uint32_t count = 0;
+uint32_t color = 0b111111;
+
 void setup_pio(PIO pio, uint sm, uint offset) {
     //lead default configuration for led matrix
     pio_sm_config c = matrix_pio_program_get_default_config(offset);
@@ -622,6 +628,23 @@ uint32_t get_data(int phys_col, int phys_row) {
     return (bottom << 3) | top;
 }
 
+// uint32_t get_line(int target_col, uint32_t color, int col)
+// {
+//     //inital line == 0
+//     uint32_t line = 0b0;
+
+//     //if the target_col it hsould be on is the current colum
+//     //then set the line to 1
+//     if (target_col = col)
+//     {
+//         //i think shoudl fill
+//         //top and bottom rows for that col
+//         //dont need to seperate line ball and paddle becuase nothing is cut off??
+//         line = (color << 3) | color;
+//     }
+//     return line;
+// }
+
 int main() {
     stdio_init_all();
 
@@ -644,6 +667,52 @@ int main() {
     setup_pio(pio, sm, offset);
 
     while (true) {
+        // //move the line down 
+        // if (count++ % 100 == 0)
+        // {
+        //     //update the target_col to icnrease by 1
+        //     //wraps around every 64 columns
+        //     target_col = (target_col + 1) % 64;
+        // }
+        //ball physics
+        bx += 1;
+        by += 1;
+
+        // if (by == target_col)
+        // {
+        //     by += -1;
+        // }
+
+        //bound off side of walls rows 0 and 31
+        if (bx <= 0 || bx >= 31)
+        {
+            bx += -1;
+        }
+
+        //bound of top 
+        if (by >= 63 || by <= 0)
+        {
+            by += -1;
+        }
+
+        //bound off the paddle
+        // int paddle_x = 8;
+        // int paddle_y = 2; // Near the bottom
+        // int paddle_width = 16;
+        // int paddle_height = 2;
+        //static positions
+        // int bx = 16;
+        // int by = 32; // Centered vertically
+        // int radius_sq = 9;
+        
+        if ((paddle_y <= by) && 
+            (by <= (paddle_y + paddle_height)) && 
+            (paddle_x <= bx) && 
+            (bx <= (paddle_width + paddle_x)))
+        {
+            by += 1;
+        }
+
         for (int row = 0; row < 16; row++) {
             //disable display to prevent ghosting while swittching rows
             gpio_put(OE_PIN, 1); 
@@ -658,10 +727,18 @@ int main() {
                 for (int p = 0; p < 4; p++) {
                     int col = (i * 4) + p;
                     //get color for the specific coordinate
+                    //only for ball and paddle!!!!
                     uint32_t mask = get_data(col, row);
 
+                    // uint32_t line = get_line(target_col, color, col);
+
+                    //find mask with added line
+                    // mask |= line;
+                    
                     //ensure mask is only 6 bits
+                    //having trouble lining up the ball and paddle
                     mask &= 0x3F;
+
                     //pack 6-bit color into 32-bit word for PIO
                     packed_word |= (mask << (p * 6));
                 }
