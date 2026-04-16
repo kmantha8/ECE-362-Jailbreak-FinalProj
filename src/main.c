@@ -533,6 +533,8 @@ uint32_t count = 0;
 uint32_t color = 0b111111;
 
 bool lose_end = false;
+bool box1_exists = true;
+bool box2_exists = true;
 
 void setup_pio(PIO pio, uint sm, uint offset) {
     //lead default configuration for led matrix
@@ -626,33 +628,63 @@ uint32_t ball_paddle(int col, int row) {
     return bits_ball | bits_paddle;
 }
 
-//easier to scan rows so dont have to it in additional functions
-uint32_t get_data(int phys_col, int phys_row) {
-    // We swap row/col here to match the verical orientation
-    uint32_t top = ball_paddle(phys_row, phys_col);
-    
-    // Row 16-31 just add 16 to rows
-    uint32_t bottom = ball_paddle(phys_row + 16, phys_col);
-    
-    return (bottom << 3) | top;
-}
-
-uint32_t get_line(int target_col, uint32_t color, int col)
+uint32_t get_boxes(int target_col, uint32_t color, int col, int row)
 {
-    //inital line == 0
-    uint32_t line = 0b0;
+    uint32_t boxes = 0b0;
 
     //if the target_col it hsould be on is the current colum
     //then set the line to 1
     if (target_col == col)
     {
-        //i think shoudl fill
-        //top and bottom rows for that col
-        //dont need to seperate line ball and paddle becuase nothing is cut off??
-        line = (color << 3) | color;
+        //box sizes
+        bool box1 = ((row >= 1) && (row <= 15));
+        bool box2 = (((row) >= 17) && ((row) <= 30));
+
+        //if the col and row is a  box
+        if (box1 || box2)
+        {
+            //turn on that box color for both top and bottom row
+            return color;
+        }
     }
-    return line;
+    return 0;
 }
+
+//easier to scan rows so dont have to it in additional functions
+uint32_t get_data(int phys_col, int phys_row) {
+    // We swap row/col here to match the verical orientation
+    uint32_t top_ball = ball_paddle(phys_row, phys_col);
+    
+    // Row 16-31 just add 16 to rows
+    uint32_t bottom_ball = ball_paddle(phys_row + 16, phys_col);
+
+    //do the same thing for boxes
+    uint32_t color = 0b111;
+    uint32_t top_box = get_boxes(target_col, color, phys_col, phys_row);
+    uint32_t bottom_box = get_boxes(target_col, color, phys_col, phys_row + 16);
+    
+    uint32_t top = top_ball | top_box;
+    uint32_t bottom = bottom_ball | bottom_box;
+
+    return (bottom << 3) | top;
+}
+
+// uint32_t get_line(int target_col, uint32_t color, int col)
+// {
+//     //inital line == 0
+//     uint32_t line = 0b0;
+
+//     //if the target_col it hsould be on is the current colum
+//     //then set the line to 1
+//     if (target_col == col)
+//     {
+//         //i think shoudl fill
+//         //top and bottom rows for that col
+//         //dont need to seperate line ball and paddle becuase nothing is cut off??
+//         line = (color << 3) | color;
+//     }
+//     return line;
+// }
 
 int main() {
     stdio_init_all();
@@ -766,14 +798,19 @@ int main() {
                     //only for ball and paddle!!!!
                     uint32_t mask = get_data(col, row);
 
-                    uint32_t line = get_line(target_col, color, col);
+                    // uint32_t line = get_line(target_col, color, col);
+                    // uint32_t boxes = get_boxes(target_col, color, col, row);
 
                     //find mask with added line
-                    mask |= line;
+                    // mask |= line;
+                    // mask |= boxes;
 
+                    //if the ball has either went off screen
+                    //or if the line has gotten to the end 
+                    //the game will be lost
                     if (lose_end)
                     {
-                        mask = 0b001001;
+                        mask = 0b000000;
                     }
                     
                     //ensure mask is only 6 bits
