@@ -502,6 +502,7 @@
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
+#include "highscore.h"
 #include "matrix.pio.h"
 
 //Pin mapping
@@ -515,18 +516,29 @@
 #define BLACK 0b000000
 
 #define MAX_BOX_ROWS 10
-int box_y_pos[MAX_BOX_ROWS] = {63, 66, 69, 72, 75, 78, 81, 84, 87, 90};
-bool box1_on[MAX_BOX_ROWS] = {true, true, true, true, true, true, true, true, true, true};
-bool box2_on[MAX_BOX_ROWS] = {true, true, true, true, true, true, true, true, true, true};
+static const int initial_box_y_pos[MAX_BOX_ROWS] = {63, 66, 69, 72, 75, 78, 81, 84, 87, 90};
+static const float initial_ball_x = 16.0f;
+static const float initial_ball_y = 32.0f;
+static const float initial_ball_dx = 0.1f;
+static const float initial_ball_dy = 0.15f;
+static const int initial_paddle_x = 8;
+static const int initial_paddle_y = 2;
+static const int initial_paddle_width = 16;
+static const int initial_paddle_height = 2;
+static const int initial_radius_sq = 4;
+
+int box_y_pos[MAX_BOX_ROWS];
+bool box1_on[MAX_BOX_ROWS];
+bool box2_on[MAX_BOX_ROWS];
 
 //static positions
-float bx = 16.0f;
-float by = 32.0f; // Centered vertically'
-float ball_dx = 0.1f; //horixonal speed
-float ball_dy = 0.15f; //verifucal speed
+float bx;
+float by; // Centered vertically'
+float ball_dx; //horixonal speed
+float ball_dy; //verifucal speed
 int radius_sq = 4;
 
-int paddle_x = 8;
+int paddle_x;
 int paddle_y = 2; // Near the bottom
 int paddle_width = 16;
 int paddle_height = 2;
@@ -539,10 +551,64 @@ uint32_t color = 0b111;
 uint32_t score = 0;
 
 bool lose_end = false;
+bool score_saved_this_round = false;
+bool reset_armed = false;
 // bool box1_exists = true;
 // bool box2_exists = true;
 bool btn_21_prev = false;
 bool btn_26_prev = false;
+
+void reset_game_state(void) {
+    for (int i = 0; i < MAX_BOX_ROWS; i++) {
+        box_y_pos[i] = initial_box_y_pos[i];
+        box1_on[i] = true;
+        box2_on[i] = true;
+    }
+
+    bx = initial_ball_x;
+    by = initial_ball_y;
+    ball_dx = initial_ball_dx;
+    ball_dy = initial_ball_dy;
+
+    paddle_x = initial_paddle_x;
+    paddle_y = initial_paddle_y;
+    paddle_width = initial_paddle_width;
+    paddle_height = initial_paddle_height;
+    radius_sq = initial_radius_sq;
+    target_col = 63;
+    count = 0;
+    color = 0b111;
+    score = 0;
+    lose_end = false;
+    score_saved_this_round = false;
+    reset_armed = false;
+}
+
+static void trigger_game_over(void) {
+    if (lose_end) {
+        return;
+    }
+
+    lose_end = true;
+    reset_armed = false;
+
+    if (!score_saved_this_round) {
+        score_saved_this_round = true;
+
+        if (highscore_is_ready()) {
+            bool score_ok = highscore_submit(score);
+            printf("Game over. Score %lu. Best %lu.\r\n",
+                   (unsigned long)score,
+                   (unsigned long)highscore_get_best());
+            if (!score_ok) {
+                printf("High score write failed.\r\n");
+            }
+        } else {
+            printf("Game over. Score %lu. SD card unavailable.\r\n",
+                   (unsigned long)score);
+        }
+    }
+}
 
 
 void setup_pio(PIO pio, uint sm, uint offset) {
@@ -875,6 +941,10 @@ int main() {
     //run conifguration
     setup_pio(pio, sm, offset);
 
+    reset_game_state();
+    highscore_init();
+    printf("Press either button after game over to start a new round.\r\n");
+
     while (true) {
 
         //BUTTON LOGIC
@@ -884,189 +954,147 @@ int main() {
 
         bool btn_21_cur = (sio_hw->gpio_in & (1u << 21));
         bool btn_26_cur = (sio_hw->gpio_in & (1u << 26));
+        bool btn_21_pressed = btn_21_cur && !btn_21_prev;
+        bool btn_26_pressed = btn_26_cur && !btn_26_prev;
 
-        //again just taken from lab1
-        //adjusted to change color for testing
-        // if (sio_hw->gpio_in & (1u << 21))
-        // if (gpio_get_irq_event_mask(21) & GPIO_IRQ_EDGE_RISE)
-        if (btn_21_cur && !btn_21_prev)
-        {
-            //acknowledge IRQ
-            // gpio_acknowledge_irq(21, GPIO_IRQ_EDGE_RISE);
-            //change the color to red
-            color = 0b001;
-            //boundaries so the paddle doesnt disappear
-            if (paddle_x > 0)
-            {
-                paddle_x--;
+        if (lose_end) {
+            if (!btn_21_cur && !btn_26_cur) {
+                reset_armed = true;
             }
-            // paddle_x--;
-        }
-
-        // if (sio_hw->gpio_in & (1u << 26))
-        // if (gpio_get_irq_event_mask(26) & GPIO_IRQ_EDGE_RISE)
-        if (btn_26_cur && !btn_26_prev) 
-        {
-            //acknowledge IRQ
-            // gpio_acknowledge_irq(26, GPIO_IRQ_EDGE_RISE);
-            //change the color to red
-            color = 0b010;
-            // paddle_x++;
-            //boundaries so the paddle doesnt disappear
-            if (paddle_x < (32 - paddle_width))
+            if (reset_armed && (btn_21_pressed || btn_26_pressed)) {
+                reset_game_state();
+                btn_21_prev = btn_21_cur;
+                btn_26_prev = btn_26_cur;
+                continue;
+            }
+        } else {
+            if (btn_21_pressed)
             {
-                paddle_x++;
+                //acknowledge IRQ
+                // gpio_acknowledge_irq(21, GPIO_IRQ_EDGE_RISE);
+                //change the color to red
+                color = 0b001;
+                //boundaries so the paddle doesnt disappear
+                if (paddle_x > 0)
+                {
+                    paddle_x--;
+                }
+            }
+
+            if (btn_26_pressed) 
+            {
+                //acknowledge IRQ
+                // gpio_acknowledge_irq(26, GPIO_IRQ_EDGE_RISE);
+                //change the color to red
+                color = 0b010;
+                //boundaries so the paddle doesnt disappear
+                if (paddle_x < (32 - paddle_width))
+                {
+                    paddle_x++;
+                }
+            }
+
+            // //move the line down 
+            if (count++ % 200 == 0)
+            {
+                //do the same thing but for all box rows
+                for (int i = 0; i < MAX_BOX_ROWS; i++)
+                {
+                    box_y_pos[i]--;
+
+                    //if boxes hit the paddle
+                    if (box_y_pos[i] <= 2)
+                    {
+                        if (box1_on[i] || box2_on[i])
+                        {
+                            trigger_game_over();
+                            break;
+                        }
+                        else
+                        {
+                            //box should "respawn at the top"
+                            box_y_pos[i] = 63; 
+                            box1_on[i] = true;
+                            box2_on[i] = true;
+                        }
+                    }
+                }
+            }
+
+            if (!lose_end) {
+                //ball physics
+                bx += ball_dx;
+                by += ball_dy;
+
+                int int_bx = (int)bx;
+                int int_by = (int)by;
+
+                //change the endges because is bx and by were
+                //exactly inbetween the boxes it was going thorugh it
+                for (int i = 0; i < MAX_BOX_ROWS; i++)
+                {
+                    if (((int_by - 2) <= (box_y_pos[i]))
+                        && ((int_by + 2) >= box_y_pos[i])
+                        && ((int_bx - 1) <= 16)
+                        && (int_bx >= 0)
+                        && box1_on[i]
+                        )
+                    {
+                        ball_dy *= -1;
+                        by -= 0.1f;
+                        box1_on[i] = false;
+                        score++;
+                    }
+
+                    if (((int_by - 2) <= (box_y_pos[i]))
+                        && (int_by + 2 >= box_y_pos[i])
+                        && ((int_bx) <= 31)
+                        && ((int_bx + 1) >= 17)
+                        && box2_on[i]
+                        )
+                    {
+                        ball_dy *= -1;
+                        by -= 0.1f;
+                        box2_on[i] = false;
+                        score++;
+                    }
+                }
+
+                //bound off side of walls rows 0 and 31
+                //take into account radius of 2
+                if (int_bx <= 2 || int_bx >= 29)
+                {
+                    //revserve the speed of the ball so
+                    //that it continus on in that direction
+                    ball_dx *= -1;
+                }
+
+                //bound of top 
+                if (int_by >= 61)
+                {
+                    ball_dy *= -1;
+                }
+
+                if (((paddle_y - 2) <= int_by) && 
+                    (int_by <= (paddle_y + paddle_height + 2)) && 
+                    ((paddle_x - 2) <= int_bx) && 
+                    (int_bx <= (paddle_width + paddle_x + 2)))
+                {
+                    ball_dy *= -1;
+                    //ball gets stuck rolling on paddle
+                    //have to move it off
+                    by += 0.2f;
+                }
+
+                if ((int_by - 2) < (paddle_y))
+                {
+                    trigger_game_over();
+                }
             }
         }
 
         btn_21_prev = btn_21_cur;
         btn_26_prev = btn_26_cur;
-
-        // //move the line down 
-        if (count++ % 200 == 0)
-        {
-            //update the target_col to icnrease by 1
-            //wraps around every 64 columns
-            // target_col = (target_col - 1);
-
-            // if ((target_col == 0)
-            //     && (box1_exists || box2_exists)
-            //     )
-            // {
-            //     // target_col = 63;
-            //     lose_end = true;
-            // }
-
-            //do the same thing but for all box rows
-            for (int i = 0; i < MAX_BOX_ROWS; i++)
-            {
-                box_y_pos[i]--;
-
-                //if boxes hit the paddle
-                if (box_y_pos[i] <= 2)
-                {
-                    if (box1_on[i] || box2_on[i])
-                    {
-                        lose_end = true;
-                        // box_y_pos[i] = 63;
-                    }
-                    else
-                    {
-                        //box should "respawn at the top"
-                        box_y_pos[i] = 63; 
-                        box1_on[i] = true;
-                        box2_on[i] = true;
-                    }
-                }
-            }
-        }
-        //ball physics
-        bx += ball_dx;
-        by += ball_dy;
-
-        int int_bx = (int)bx;
-        int int_by = (int)by;
-
-        // if (((int_by - 2) <= (target_col))
-        //     && (int_by >= target_col)
-        //     && (int_bx <= 15)
-        //     && (int_bx >= 1)
-        //     && box1_exists
-        //     )
-        // {
-        //     ball_dy *= -1;
-        //     by -= 0.1f;
-        //     box1_exists = false;
-        // }
-
-        // if (((int_by - 2) <= (target_col))
-        //     && (int_by >= target_col)
-        //     && ((int_bx) <= 30)
-        //     && ((int_bx - 2) >= 17)
-        //     && box2_exists
-        //     )
-        // {
-        //     ball_dy *= -1;
-        //     by -= 0.1f;
-        //     box2_exists = false;
-        // }
-
-
-        //change the endges because is bx and by were
-        //exactly inbetween the boxes it was going thorugh it
-        for (int i = 0; i < MAX_BOX_ROWS; i++)
-        {
-            if (((int_by - 2) <= (box_y_pos[i]))
-                && ((int_by + 2) >= box_y_pos[i])
-                && ((int_bx - 1) <= 16)
-                && (int_bx >= 0)
-                && box1_on[i]
-                )
-            {
-                ball_dy *= -1;
-                by -= 0.1f;
-                box1_on[i] = false;
-                score++;
-            }
-
-            if (((int_by - 2) <= (box_y_pos[i]))
-                && (int_by + 2 >= box_y_pos[i])
-                && ((int_bx) <= 31)
-                && ((int_bx + 1) >= 17)
-                && box2_on[i]
-                )
-            {
-                ball_dy *= -1;
-                by -= 0.1f;
-                box2_on[i] = false;
-                score++;
-            }
-        }
-
-        //bound off side of walls rows 0 and 31
-        //take into account radius of 2
-        if (int_bx <= 2 || int_bx >= 29)
-        {
-            //revserve the speed of the ball so
-            //that it continus on in that direction
-            ball_dx *= -1;
-        }
-
-        //bound of top 
-        if (int_by >= 61)
-        {
-            ball_dy *= -1;
-        }
-
-        //bound off the paddle
-        // int paddle_x = 8;
-        // int paddle_y = 2; // Near the bottom
-        // int paddle_width = 16;
-        // int paddle_height = 2;
-        //static positions
-        // int bx = 16;
-        // int by = 32; // Centered vertically
-        // int radius_sq = 9;
-        
-        if (((paddle_y - 2) <= int_by) && 
-            (int_by <= (paddle_y + paddle_height + 2)) && 
-            ((paddle_x - 2) <= int_bx) && 
-            (int_bx <= (paddle_width + paddle_x + 2)))
-        {
-            ball_dy *= -1;
-            //ball gets stuck rolling on paddle
-            //have to move it off
-            by += 0.2f;
-        }
-
-        if ((int_by - 2) < (paddle_y))
-        {
-            // bx = 16.0f;
-            // by = 32.0f; // Centered vertically'
-            // ball_dx = -0.1f; //horixonal speed
-            // ball_dy = 0.15f; //verifucal speed
-            lose_end = true;
-        }
 
         for (int row = 0; row < 16; row++) {
             //disable display to prevent ghosting while swittching rows
