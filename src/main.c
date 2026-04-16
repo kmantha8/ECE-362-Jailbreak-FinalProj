@@ -514,6 +514,11 @@
 #define WHITE 0b111111 
 #define BLACK 0b000000
 
+#define MAX_BOX_ROWS 5
+int box_y_pos[MAX_BOX_ROWS] = {63, 65, 67, 69, 71};
+bool box1_on[MAX_BOX_ROWS] = {true, true, true, true, true};
+bool box2_on[MAX_BOX_ROWS] = {true, true, true, true, true};
+
 //static positions
 float bx = 16.0f;
 float by = 32.0f; // Centered vertically'
@@ -533,8 +538,8 @@ uint32_t count = 0;
 uint32_t color = 0b111111;
 
 bool lose_end = false;
-bool box1_exists = true;
-bool box2_exists = true;
+// bool box1_exists = true;
+// bool box2_exists = true;
 
 void setup_pio(PIO pio, uint sm, uint offset) {
     //lead default configuration for led matrix
@@ -628,9 +633,9 @@ uint32_t ball_paddle(int col, int row) {
     return bits_ball | bits_paddle;
 }
 
-uint32_t get_boxes(int target_col, uint32_t color, int col, int row)
+uint32_t get_boxes(int target_col, uint32_t color, int col, int row, bool box1_exists, bool box2_exists)
 {
-    uint32_t boxes = 0b0;
+    // uint32_t boxes = 0b0;
 
     //if the target_col it hsould be on is the current colum
     //then set the line to 1
@@ -656,19 +661,26 @@ uint32_t get_boxes(int target_col, uint32_t color, int col, int row)
 
 //easier to scan rows so dont have to it in additional functions
 uint32_t get_data(int phys_col, int phys_row) {
+    
     // We swap row/col here to match the verical orientation
-    uint32_t top_ball = ball_paddle(phys_row, phys_col);
+    uint32_t top = ball_paddle(phys_row, phys_col);
     
     // Row 16-31 just add 16 to rows
-    uint32_t bottom_ball = ball_paddle(phys_row + 16, phys_col);
+    uint32_t bottom = ball_paddle(phys_row + 16, phys_col);
 
     //do the same thing for boxes
     uint32_t color = 0b111;
-    uint32_t top_box = get_boxes(target_col, color, phys_col, phys_row);
-    uint32_t bottom_box = get_boxes(target_col, color, phys_col, phys_row + 16);
+    // uint32_t top_box = get_boxes(target_col, color, phys_col, phys_row);
+    // uint32_t bottom_box = get_boxes(target_col, color, phys_col, phys_row + 16);
+
+    for (int i = 0; i < MAX_BOX_ROWS; i ++)
+    {
+        top |= get_boxes(box_y_pos[i], color, phys_col, phys_row, box1_on[i], box2_on[i]);
+        bottom |= get_boxes(box_y_pos[i], color, phys_col, phys_row + 16, box1_on[i], box2_on[i]);
+    }
     
-    uint32_t top = top_ball | top_box;
-    uint32_t bottom = bottom_ball | bottom_box;
+    // uint32_t top = top_ball | top_box;
+    // uint32_t bottom = bottom_ball | bottom_box;
 
     return (bottom << 3) | top;
 }
@@ -717,14 +729,25 @@ int main() {
         {
             //update the target_col to icnrease by 1
             //wraps around every 64 columns
-            target_col = (target_col - 1);
+            // target_col = (target_col - 1);
 
-            if ((target_col == 0)
-                && (box1_exists || box2_exists)
-                )
+            // if ((target_col == 0)
+            //     && (box1_exists || box2_exists)
+            //     )
+            // {
+            //     // target_col = 63;
+            //     lose_end = true;
+            // }
+
+            //do the same thing but for all box rows
+            for (int i = 0; i < MAX_BOX_ROWS; i++)
             {
-                // target_col = 63;
-                lose_end = true;
+                box_y_pos[i]--;
+
+                if (box_y_pos[i] <= 0)
+                {
+                    lose_end = true;
+                }
             }
         }
         //ball physics
@@ -734,28 +757,58 @@ int main() {
         int int_bx = (int)bx;
         int int_by = (int)by;
 
-        if (((int_by - 2) <= (target_col))
-            && (int_by >= target_col)
-            && (int_bx <= 15)
-            && (int_bx >= 1)
-            && box1_exists
-            )
-        {
-            ball_dy *= -1;
-            by -= 0.1f;
-            box1_exists = false;
-        }
+        // if (((int_by - 2) <= (target_col))
+        //     && (int_by >= target_col)
+        //     && (int_bx <= 15)
+        //     && (int_bx >= 1)
+        //     && box1_exists
+        //     )
+        // {
+        //     ball_dy *= -1;
+        //     by -= 0.1f;
+        //     box1_exists = false;
+        // }
 
-        if (((int_by - 2) <= (target_col))
-            && (int_by >= target_col)
-            && ((int_bx) <= 30)
-            && ((int_bx - 2) >= 17)
-            && box2_exists
-            )
+        // if (((int_by - 2) <= (target_col))
+        //     && (int_by >= target_col)
+        //     && ((int_bx) <= 30)
+        //     && ((int_bx - 2) >= 17)
+        //     && box2_exists
+        //     )
+        // {
+        //     ball_dy *= -1;
+        //     by -= 0.1f;
+        //     box2_exists = false;
+        // }
+
+
+        //change the endges because is bx and by were
+        //exactly inbetween the boxes it was going thorugh it
+        for (int i = 0; i < MAX_BOX_ROWS; i++)
         {
-            ball_dy *= -1;
-            by -= 0.1f;
-            box2_exists = false;
+            if (((int_by - 2) <= (box_y_pos[i]))
+                && ((int_by + 2) >= box_y_pos[i])
+                && ((int_bx - 1) <= 16)
+                && (int_bx >= 0)
+                && box1_on[i]
+                )
+            {
+                ball_dy *= -1;
+                by -= 0.1f;
+                box1_on[i] = false;
+            }
+
+            if (((int_by - 2) <= (box_y_pos[i]))
+                && (int_by + 2 >= box_y_pos[i])
+                && ((int_bx) <= 31)
+                && ((int_bx + 1) >= 17)
+                && box2_on[i]
+                )
+            {
+                ball_dy *= -1;
+                by -= 0.1f;
+                box2_on[i] = false;
+            }
         }
 
         //bound off side of walls rows 0 and 31
@@ -794,7 +847,7 @@ int main() {
             by += 0.2f;
         }
 
-        if (int_by < (paddle_y))
+        if ((int_by - 2) < (paddle_y))
         {
             // bx = 16.0f;
             // by = 32.0f; // Centered vertically'
@@ -867,5 +920,6 @@ int main() {
         }
     }
 }
+
 
 
