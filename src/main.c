@@ -641,9 +641,13 @@ uint32_t get_boxes(int target_col, uint32_t color, int col, int row)
         bool box2 = (((row) >= 17) && ((row) <= 30));
 
         //if the col and row is a  box
-        if (box1 || box2)
+        if (box1 && box1_exists)
         {
             //turn on that box color for both top and bottom row
+            return color;
+        }
+        else if (box2 && box2_exists)
+        {
             return color;
         }
     }
@@ -715,7 +719,9 @@ int main() {
             //wraps around every 64 columns
             target_col = (target_col - 1);
 
-            if (target_col == 0)
+            if ((target_col == 0)
+                && (box1_exists || box2_exists)
+                )
             {
                 // target_col = 63;
                 lose_end = true;
@@ -730,10 +736,26 @@ int main() {
 
         if (((int_by - 2) <= (target_col))
             && (int_by >= target_col)
+            && (int_bx <= 15)
+            && (int_bx >= 1)
+            && box1_exists
             )
         {
             ball_dy *= -1;
             by -= 0.1f;
+            box1_exists = false;
+        }
+
+        if (((int_by - 2) <= (target_col))
+            && (int_by >= target_col)
+            && ((int_bx) <= 30)
+            && ((int_bx - 2) >= 17)
+            && box2_exists
+            )
+        {
+            ball_dy *= -1;
+            by -= 0.1f;
+            box2_exists = false;
         }
 
         //bound off side of walls rows 0 and 31
