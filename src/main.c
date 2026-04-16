@@ -540,6 +540,9 @@ uint32_t color = 0b111;
 bool lose_end = false;
 // bool box1_exists = true;
 // bool box2_exists = true;
+bool btn_21_prev = false;
+bool btn_26_prev = false;
+
 
 void setup_pio(PIO pio, uint sm, uint offset) {
     //lead default configuration for led matrix
@@ -692,9 +695,9 @@ void init_inputs() {
     uint32_t mask = (1u << 21) | (1u << 26);
     sio_hw->gpio_oe_clr = mask;
 
-    //have to set he function for them to work 
-    //HAVE TO ASK ABOUT IN LAB
-    //THAT IS THE ONE THING THAT IS PROBS WRONG
+    // have to set he function for them to work 
+    // HAVE TO ASK ABOUT IN LAB
+    // THAT IS THE ONE THING THAT IS PROBS WRONG
     hw_write_masked(&pads_bank0_hw->io[21],
                    PADS_BANK0_GPIO0_IE_BITS,
                    PADS_BANK0_GPIO0_IE_BITS | PADS_BANK0_GPIO0_OD_BITS
@@ -708,6 +711,15 @@ void init_inputs() {
     );
     io_bank0_hw->io[26].ctrl = GPIO_FUNC_SIO << IO_BANK0_GPIO0_CTRL_FUNCSEL_LSB;
     hw_clear_bits(&pads_bank0_hw->io[26], PADS_BANK0_GPIO0_ISO_BITS);
+
+    // gpio_init(21);
+    // gpio_init(26);
+
+    // gpio_set_dir(21, GPIO_IN);
+    // gpio_set_dir(26, GPIO_IN);
+    // Enable rising edge detection
+    // gpio_set_irq_enabled(21, GPIO_IRQ_EDGE_RISE, true);
+    // gpio_set_irq_enabled(26, GPIO_IRQ_EDGE_RISE, true);
 }
 
 // uint32_t get_line(int target_col, uint32_t color, int col)
@@ -754,21 +766,49 @@ int main() {
     while (true) {
 
         //BUTTON LOGIC
+        //want to have it so one button press
+        //moves it one pixel
+        //need to track prevous state
+
+        bool btn_21_cur = (sio_hw->gpio_in & (1u << 21));
+        bool btn_26_cur = (sio_hw->gpio_in & (1u << 26));
+
         //again just taken from lab1
         //adjusted to change color for testing
-        if (sio_hw->gpio_in & (1u << 21))
+        // if (sio_hw->gpio_in & (1u << 21))
+        // if (gpio_get_irq_event_mask(21) & GPIO_IRQ_EDGE_RISE)
+        if (btn_21_cur && !btn_21_prev)
         {
+            //acknowledge IRQ
+            // gpio_acknowledge_irq(21, GPIO_IRQ_EDGE_RISE);
             //change the color to red
             color = 0b001;
+            //boundaries so the paddle doesnt disappear
+            if (paddle_x > 0)
+            {
+                paddle_x--;
+            }
+            // paddle_x--;
         }
 
-        if (sio_hw->gpio_in & (1u << 26))
+        // if (sio_hw->gpio_in & (1u << 26))
+        // if (gpio_get_irq_event_mask(26) & GPIO_IRQ_EDGE_RISE)
+        if (btn_26_cur && !btn_26_prev) 
         {
+            //acknowledge IRQ
+            // gpio_acknowledge_irq(26, GPIO_IRQ_EDGE_RISE);
             //change the color to red
             color = 0b010;
+            // paddle_x++;
+            //boundaries so the paddle doesnt disappear
+            if (paddle_x < (32 - paddle_width))
+            {
+                paddle_x++;
+            }
         }
 
-
+        btn_21_prev = btn_21_cur;
+        btn_26_prev = btn_26_cur;
 
         // //move the line down 
         if (count++ % 200 == 0)
