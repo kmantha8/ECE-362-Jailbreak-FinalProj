@@ -499,11 +499,19 @@
 //////////////////////////////////////////////
 
 #include <stdio.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
 #include "highscore.h"
 #include "matrix.pio.h"
+#include "ff.h"      // FatFs header
+#include "diskio.h"  // SD card interface functions
+#include "sdcard_hw.h"
+
+#ifndef SD_WIRING_TEST
+#define SD_WIRING_TEST 0
+#endif
 
 //Pin mapping
 #define DATA_BASE_PIN 1 
@@ -511,6 +519,7 @@
 #define CLK_PIN 11
 #define LAT_PIN 12
 #define OE_PIN 13
+
 
 #define WHITE 0b111111 
 #define BLACK 0b000000
@@ -917,8 +926,117 @@ uint32_t game_over(int col, int row)
     return (bottom << 3) | top;
 }
 
+static const char *fatfs_result_string(FRESULT result) {
+    switch (result) {
+    case FR_OK:
+        return "OK";
+    case FR_DISK_ERR:
+        return "Low-level disk error";
+    case FR_NOT_READY:
+        return "Drive not ready";
+    case FR_NO_FILE:
+        return "File not found";
+    case FR_INVALID_NAME:
+        return "Invalid name";
+    case FR_DENIED:
+        return "Access denied";
+    case FR_WRITE_PROTECTED:
+        return "Write protected";
+    case FR_NOT_ENABLED:
+        return "No work area";
+    case FR_NO_FILESYSTEM:
+        return "No FAT filesystem";
+    case FR_TIMEOUT:
+        return "Timeout";
+    case FR_INVALID_PARAMETER:
+        return "Invalid parameter";
+    default:
+        return "Other FatFs error";
+    }
+}
+
+void check_sd_card_detection(void) {
+    static const char test_text[] = "sd wiring ok\r\n";
+    FATFS fs;
+    FIL file;
+    FRESULT res;
+    DSTATUS status;
+    UINT transferred = 0;
+    char readback[sizeof(test_text)] = {0};
+
+    sleep_ms(2000);
+    printf("\r\nSD wiring test\r\n");
+    printf("Pins: MISO=%d CS=%d SCK=%d MOSI=%d\r\n",
+           SD_MISO_PIN, SD_CS_PIN, SD_SCK_PIN, SD_MOSI_PIN);
+
+    status = disk_initialize(0);
+    printf("disk_initialize(0) -> 0x%02x\r\n", status);
+    if (status != 0) {
+        printf("Low-level init failed.\r\n");
+        printf("Check MOSI/MISO/SCK/CS, SD power, ground, and the 10k pull-up on MISO.\r\n");
+        return;
+    }
+
+    status = disk_status(0);
+    printf("disk_status(0) -> 0x%02x\r\n", status);
+
+    res = f_mount(&fs, "", 1);
+    printf("f_mount -> %d (%s)\r\n", res, fatfs_result_string(res));
+    if (res != FR_OK) {
+        if (res == FR_NO_FILESYSTEM) {
+            printf("The card responded, but it is not formatted as FAT/FAT32.\r\n");
+        }
+        return;
+    }
+
+    res = f_open(&file, "SDTEST.TXT", FA_WRITE | FA_CREATE_ALWAYS);
+    printf("f_open(write) -> %d (%s)\r\n", res, fatfs_result_string(res));
+    if (res != FR_OK) {
+        f_mount(NULL, "", 0);
+        return;
+    }
+
+    res = f_write(&file, test_text, (UINT)(sizeof(test_text) - 1), &transferred);
+    printf("f_write -> %d (%s), bytes=%u\r\n",
+           res, fatfs_result_string(res), transferred);
+    f_sync(&file);
+    f_close(&file);
+    if (res != FR_OK || transferred != (UINT)(sizeof(test_text) - 1)) {
+        f_mount(NULL, "", 0);
+        return;
+    }
+
+    res = f_open(&file, "SDTEST.TXT", FA_READ);
+    printf("f_open(read) -> %d (%s)\r\n", res, fatfs_result_string(res));
+    if (res != FR_OK) {
+        f_mount(NULL, "", 0);
+        return;
+    }
+
+    res = f_read(&file, readback, (UINT)(sizeof(readback) - 1), &transferred);
+    f_close(&file);
+    printf("f_read -> %d (%s), bytes=%u\r\n",
+           res, fatfs_result_string(res), transferred);
+    printf("readback: %s", readback);
+
+    if (res == FR_OK && strcmp(readback, test_text) == 0) {
+        printf("SD wiring test passed.\r\n");
+    } else {
+        printf("Readback mismatch. The SPI link may be unstable.\r\n");
+    }
+
+    f_mount(NULL, "", 0);
+}
+
 int main() {
     stdio_init_all();
+
+#if SD_WIRING_TEST
+    check_sd_card_detection();
+    while (true) {
+        sleep_ms(1000);
+    }
+#endif
 
     //call button function
     init_inputs();
