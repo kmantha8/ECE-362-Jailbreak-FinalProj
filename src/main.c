@@ -517,8 +517,8 @@
 //static positions
 float bx = 16.0f;
 float by = 32.0f; // Centered vertically'
-float ball_dx = 0.2f; //horixonal speed
-float ball_dy = 0.2f; //verifucal speed
+float ball_dx = 0.1f; //horixonal speed
+float ball_dy = 0.15f; //verifucal speed
 int radius_sq = 4;
 
 int paddle_x = 8;
@@ -528,7 +528,7 @@ int paddle_height = 2;
 
 //initaial move varibles for moving line
 //i think need in other things
-int target_col = 0;
+int target_col = 63;
 uint32_t count = 0;
 uint32_t color = 0b111111;
 
@@ -635,22 +635,22 @@ uint32_t get_data(int phys_col, int phys_row) {
     return (bottom << 3) | top;
 }
 
-// uint32_t get_line(int target_col, uint32_t color, int col)
-// {
-//     //inital line == 0
-//     uint32_t line = 0b0;
+uint32_t get_line(int target_col, uint32_t color, int col)
+{
+    //inital line == 0
+    uint32_t line = 0b0;
 
-//     //if the target_col it hsould be on is the current colum
-//     //then set the line to 1
-//     if (target_col = col)
-//     {
-//         //i think shoudl fill
-//         //top and bottom rows for that col
-//         //dont need to seperate line ball and paddle becuase nothing is cut off??
-//         line = (color << 3) | color;
-//     }
-//     return line;
-// }
+    //if the target_col it hsould be on is the current colum
+    //then set the line to 1
+    if (target_col == col)
+    {
+        //i think shoudl fill
+        //top and bottom rows for that col
+        //dont need to seperate line ball and paddle becuase nothing is cut off??
+        line = (color << 3) | color;
+    }
+    return line;
+}
 
 int main() {
     stdio_init_all();
@@ -675,12 +675,17 @@ int main() {
 
     while (true) {
         // //move the line down 
-        // if (count++ % 100 == 0)
-        // {
-        //     //update the target_col to icnrease by 1
-        //     //wraps around every 64 columns
-        //     target_col = (target_col + 1) % 64;
-        // }
+        if (count++ % 100 == 0)
+        {
+            //update the target_col to icnrease by 1
+            //wraps around every 64 columns
+            target_col = (target_col - 1);
+
+            if (target_col == 0)
+            {
+                target_col = 63;
+            }
+        }
         //ball physics
         bx += ball_dx;
         by += ball_dy;
@@ -733,8 +738,8 @@ int main() {
         {
             bx = 16.0f;
             by = 32.0f; // Centered vertically'
-            ball_dx = -0.2f; //horixonal speed
-            ball_dy = 0.2f; //verifucal speed
+            ball_dx = -0.1f; //horixonal speed
+            ball_dy = 0.15f; //verifucal speed
         }
 
         for (int row = 0; row < 16; row++) {
@@ -754,10 +759,10 @@ int main() {
                     //only for ball and paddle!!!!
                     uint32_t mask = get_data(col, row);
 
-                    // uint32_t line = get_line(target_col, color, col);
+                    uint32_t line = get_line(target_col, color, col);
 
                     //find mask with added line
-                    // mask |= line;
+                    mask |= line;
                     
                     //ensure mask is only 6 bits
                     //having trouble lining up the ball and paddle
