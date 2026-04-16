@@ -514,10 +514,10 @@
 #define WHITE 0b111111 
 #define BLACK 0b000000
 
-#define MAX_BOX_ROWS 5
-int box_y_pos[MAX_BOX_ROWS] = {63, 65, 67, 69, 71};
-bool box1_on[MAX_BOX_ROWS] = {true, true, true, true, true};
-bool box2_on[MAX_BOX_ROWS] = {true, true, true, true, true};
+#define MAX_BOX_ROWS 10
+int box_y_pos[MAX_BOX_ROWS] = {63, 66, 69, 72, 75, 78, 81, 84, 87, 90};
+bool box1_on[MAX_BOX_ROWS] = {true, true, true, true, true, true, true, true, true, true};
+bool box2_on[MAX_BOX_ROWS] = {true, true, true, true, true, true, true, true, true, true};
 
 //static positions
 float bx = 16.0f;
@@ -536,6 +536,7 @@ int paddle_height = 2;
 int target_col = 63;
 uint32_t count = 0;
 uint32_t color = 0b111;
+uint32_t score = 0;
 
 bool lose_end = false;
 // bool box1_exists = true;
@@ -739,6 +740,81 @@ void init_inputs() {
 //     return line;
 // }
 
+const uint32_t game_message[5] = {
+    // 0b01110011100100101111, // Row 1
+    // 0b0111_0_01110_0_1000001_1111
+    0b01110011100100000101111,
+    // 0b10000100010110111100, // Row 2
+    // 0b1000_0_10001_0_1100011_1000
+    0b10000100010110001101000,
+    // 0b10110111110010101111,
+    // 0b1011_0_11111_0_1010101_1111 // Row 3
+    0b10110111110101010101111,
+    // 0b10010100010001010000,
+    // 0b1001_0_10001_0_1001001_1000 // Row 4
+    0b10010100010100100101000,
+    // 0b01110100010001011111  
+    // 0b0111_0_10001_0_1001001_1111// Row 5
+    0b01110100010100100101111
+};
+
+const uint32_t over_message[5] = {
+    0b0111010001011110111000, // O  V  E  R
+    0b1000110001100001000100,
+    0b1000101010111101110000,
+    0b1000101010100001000100,
+    0b0111001010111101000100
+};
+
+uint32_t game_over(int col, int row)
+{
+    //rows 0 - 16
+    // uint32_t shape = 0;
+    // if (col == row || (col == row * 2))
+    // {
+    //     shape = (color << 3) | color;
+    // }
+    // else 
+    // {
+    //     shape = 0;
+    // }
+    // return shape;
+
+    uint32_t top = 0;
+    uint32_t bottom = 0;
+
+
+    int text_start_col = 17;
+    int text_start_row = 5;
+
+    //game displayed on top half
+    //(check to see if the row is in between the specied start and end row)
+    if (row >= text_start_row && row < text_start_row + 5) {
+        //start the index at the column it is at minus the start
+        //the bit_index start where the col is
+        //ex: our start is 15 so if 15-15 bit index is 0
+        int bit_index = (col - text_start_col);
+        //then the bit_index has to be between 0-19
+        //because that is how long the messahe is
+        if (bit_index >= 0 && bit_index < 23) {
+            // Check the specific bit in the bitmap
+            //since the goes to game_message and picsk the row
+            //then picsk the index in that row for that bit
+            //read from left to right
+            //EX: 1 << (19 - 0) shift the data over 19 to read that bit
+            if (game_message[row - text_start_row] & (1 << (22 - bit_index))) {
+                top = 0b001; // Red
+            }
+
+            if (over_message[row - text_start_row] & (1 << (22 - bit_index))) {
+                bottom = 0b001; // red
+            }
+        }
+    }
+
+    return (bottom << 3) | top;
+}
+
 int main() {
     stdio_init_all();
 
@@ -830,9 +906,21 @@ int main() {
             {
                 box_y_pos[i]--;
 
-                if (box_y_pos[i] <= 0)
+                //if boxes hit the paddle
+                if (box_y_pos[i] <= 2)
                 {
-                    lose_end = true;
+                    if (box1_on[i] || box2_on[i])
+                    {
+                        lose_end = true;
+                        // box_y_pos[i] = 63;
+                    }
+                    else
+                    {
+                        //box should "respawn at the top"
+                        box_y_pos[i] = 63; 
+                        box1_on[i] = true;
+                        box2_on[i] = true;
+                    }
                 }
             }
         }
@@ -882,6 +970,7 @@ int main() {
                 ball_dy *= -1;
                 by -= 0.1f;
                 box1_on[i] = false;
+                score++;
             }
 
             if (((int_by - 2) <= (box_y_pos[i]))
@@ -894,6 +983,7 @@ int main() {
                 ball_dy *= -1;
                 by -= 0.1f;
                 box2_on[i] = false;
+                score++;
             }
         }
 
@@ -957,8 +1047,7 @@ int main() {
                     int col = (i * 4) + p;
                     //get color for the specific coordinate
                     //only for ball and paddle!!!!
-                    uint32_t mask = get_data(col, row);
-
+                    uint32_t mask = 0;
                     // uint32_t line = get_line(target_col, color, col);
                     // uint32_t boxes = get_boxes(target_col, color, col, row);
 
@@ -971,7 +1060,11 @@ int main() {
                     //the game will be lost
                     if (lose_end)
                     {
-                        mask = 0b000000;
+                        mask |= game_over(col, row);
+                    }
+                    else
+                    {
+                        mask |= get_data(col, row);
                     }
                     
                     //ensure mask is only 6 bits
