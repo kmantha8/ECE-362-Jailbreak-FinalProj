@@ -19,6 +19,74 @@
 #define BLACK 0b000000
 
 #define MAX_BOX_ROWS 10
+
+#include "pico/stdlib.h"
+#include "hardware/spi.h"
+#include "ff.h"
+#include "diskio.h"
+#include <stdio.h>
+#include <string.h>
+
+/*******************************************************************/
+
+#define SD_MISO 15
+#define SD_CS 13
+#define SD_SCK 14
+#define SD_MOSI 12
+#define SD_SPI_INSTANCE spi1
+
+/*******************************************************************/
+
+void init_spi_sdcard() {
+    // 1. Configure SCK, MOSI, MISO as SPI pins
+    gpio_set_function(SD_SCK, GPIO_FUNC_SPI);
+    gpio_set_function(SD_MOSI, GPIO_FUNC_SPI);
+    gpio_set_function(SD_MISO, GPIO_FUNC_SPI);
+
+    // 2. Configure CS as a regular GPIO pin controlled by SIO
+    gpio_init(SD_CS);
+    gpio_set_dir(SD_CS, GPIO_OUT);
+    gpio_put(SD_CS, 1); // Set CS high (inactive initially)
+
+    // 3. Configure the SPI peripheral (SPI1)
+    // 400 KHz baudrate, 8-bit, CPOL=0, CPHA=0
+    spi_init(SD_SPI_INSTANCE, 400 * 1000);
+    spi_set_format(SD_SPI_INSTANCE, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+}
+
+void disable_sdcard() {
+    // Set CS high (inactive)
+    gpio_put(SD_CS, 1);
+
+    // Send 0xFF over SPI to give the SD card clock cycles to finish
+    uint8_t dummy = 0xFF;
+    spi_write_blocking(SD_SPI_INSTANCE, &dummy, 1);
+
+    // Release MOSI: Make it a GPIO and force it high
+    gpio_init(SD_MOSI);
+    gpio_set_dir(SD_MOSI, GPIO_OUT);
+    gpio_put(SD_MOSI, 1);
+}
+
+void enable_sdcard() {
+    // Take control of MOSI again by making it an SPI pin
+    gpio_set_function(SD_MOSI, GPIO_FUNC_SPI);
+
+    // Set CS low (active)
+    gpio_put(SD_CS, 0);
+}
+
+void sdcard_io_high_speed() {
+    // Change baudrate to 12 MHz for faster data transfer after init
+    spi_set_baudrate(SD_SPI_INSTANCE, 12 * 1000 * 1000);
+}
+
+void init_sdcard_io() {
+    // Fully initialize pins and put card in inactive state
+    init_spi_sdcard();
+    disable_sdcard();
+}
+
 int box_y_pos[MAX_BOX_ROWS] = {63, 66, 69, 72, 75, 78, 81, 84, 87, 90};
 bool box1_on[MAX_BOX_ROWS] = {true, true, true, true, true, true, true, true, true, true};
 bool box2_on[MAX_BOX_ROWS] = {true, true, true, true, true, true, true, true, true, true};
@@ -355,11 +423,25 @@ uint32_t game_over(int col, int row)
     return (bottom << 3) | top;
 }
 
+void init_uart();
+void init_uart_irq();
+void date(int argc, char *argv[]);
+void command_shell();
+
+
 int main() {
     stdio_init_all();
 
     //call button function
     init_inputs();
+
+    init_uart();
+    init_uart_irq();
+    
+    init_sdcard_io();
+    
+    // SD card functions will initialize everything.
+    command_shell();
 
     for(int i = 7; i <= 13; i++) {
         //set adress pins
