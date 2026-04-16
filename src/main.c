@@ -12,6 +12,7 @@
 #include "ff.h"      // FatFs header
 #include "diskio.h"  // SD card interface functions
 #include "sdcard_hw.h"
+#include "hardware/spi.h"
 
 #ifndef SD_WIRING_TEST
 #define SD_WIRING_TEST 0
@@ -803,4 +804,46 @@ int main() {
 }
 
 
+// #include <stdio.h>
+// #include "pico/stdlib.h"
+
+// int main() {
+//     stdio_init_all();
+//     sleep_ms(2000); // Give serial monitor time to connect
+
+//     const uint mosi_pin = 15;
+//     const uint miso_pin = 12;
+
+//     gpio_init(mosi_pin);
+//     gpio_set_dir(mosi_pin, GPIO_OUT);
+    
+//     gpio_init(miso_pin);
+//     gpio_set_dir(miso_pin, GPIO_IN);
+//     gpio_pull_down(miso_pin); // Ensure it stays LOW unless pushed HIGH
+
+//     printf("Starting Manual Pin Check on GP15 -> GP12...\n");
+
+//     while (true) {
+//         // Set MOSI HIGH
+//         gpio_put(mosi_pin, 1);
+//         sleep_ms(10);
+//         bool test_high = gpio_get(miso_pin);
+
+//         // Set MOSI LOW
+//         gpio_put(mosi_pin, 0);
+//         sleep_ms(10);
+//         bool test_low = gpio_get(miso_pin);
+
+//         printf("MOSI HIGH -> MISO reads: %s\n", test_high ? "PASS (1)" : "FAIL (0)");
+//         printf("MOSI LOW  -> MISO reads: %s\n", !test_low ? "PASS (0)" : "FAIL (1)");
+        
+//         if (test_high && !test_low) {
+//             printf("RESULT: PINS ARE ELECTRICALLY OK!\n");
+//         } else {
+//             printf("RESULT: HARDWARE FAULT OR WRONG PINS!\n");
+//         }
+        
+//         sleep_ms(2000);
+//     }
+// }
 
