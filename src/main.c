@@ -535,7 +535,7 @@ int paddle_height = 2;
 //i think need in other things
 int target_col = 63;
 uint32_t count = 0;
-uint32_t color = 0b111111;
+uint32_t color = 0b111;
 
 bool lose_end = false;
 // bool box1_exists = true;
@@ -669,7 +669,6 @@ uint32_t get_data(int phys_col, int phys_row) {
     uint32_t bottom = ball_paddle(phys_row + 16, phys_col);
 
     //do the same thing for boxes
-    uint32_t color = 0b111;
     // uint32_t top_box = get_boxes(target_col, color, phys_col, phys_row);
     // uint32_t bottom_box = get_boxes(target_col, color, phys_col, phys_row + 16);
 
@@ -683,6 +682,32 @@ uint32_t get_data(int phys_col, int phys_row) {
     // uint32_t bottom = bottom_ball | bottom_box;
 
     return (bottom << 3) | top;
+}
+
+//taken from prevous lab
+void init_inputs() {
+    // fill in
+    //configure gp21 and gp26 as inputs
+    //no need to set the value
+    uint32_t mask = (1u << 21) | (1u << 26);
+    sio_hw->gpio_oe_clr = mask;
+
+    //have to set he function for them to work 
+    //HAVE TO ASK ABOUT IN LAB
+    //THAT IS THE ONE THING THAT IS PROBS WRONG
+    hw_write_masked(&pads_bank0_hw->io[21],
+                   PADS_BANK0_GPIO0_IE_BITS,
+                   PADS_BANK0_GPIO0_IE_BITS | PADS_BANK0_GPIO0_OD_BITS
+    );
+    io_bank0_hw->io[21].ctrl = GPIO_FUNC_SIO << IO_BANK0_GPIO0_CTRL_FUNCSEL_LSB;
+    hw_clear_bits(&pads_bank0_hw->io[21], PADS_BANK0_GPIO0_ISO_BITS);
+    
+    hw_write_masked(&pads_bank0_hw->io[26],
+                   PADS_BANK0_GPIO0_IE_BITS,
+                   PADS_BANK0_GPIO0_IE_BITS | PADS_BANK0_GPIO0_OD_BITS
+    );
+    io_bank0_hw->io[26].ctrl = GPIO_FUNC_SIO << IO_BANK0_GPIO0_CTRL_FUNCSEL_LSB;
+    hw_clear_bits(&pads_bank0_hw->io[26], PADS_BANK0_GPIO0_ISO_BITS);
 }
 
 // uint32_t get_line(int target_col, uint32_t color, int col)
@@ -705,6 +730,9 @@ uint32_t get_data(int phys_col, int phys_row) {
 int main() {
     stdio_init_all();
 
+    //call button function
+    init_inputs();
+
     for(int i = 7; i <= 13; i++) {
         //set adress pins
         gpio_init(i);
@@ -724,6 +752,24 @@ int main() {
     setup_pio(pio, sm, offset);
 
     while (true) {
+
+        //BUTTON LOGIC
+        //again just taken from lab1
+        //adjusted to change color for testing
+        if (sio_hw->gpio_in & (1u << 21))
+        {
+            //change the color to red
+            color = 0b001;
+        }
+
+        if (sio_hw->gpio_in & (1u << 26))
+        {
+            //change the color to red
+            color = 0b010;
+        }
+
+
+
         // //move the line down 
         if (count++ % 200 == 0)
         {
