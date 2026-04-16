@@ -675,7 +675,7 @@ int main() {
 
     while (true) {
         // //move the line down 
-        if (count++ % 100 == 0)
+        if (count++ % 200 == 0)
         {
             //update the target_col to icnrease by 1
             //wraps around every 64 columns
@@ -693,10 +693,13 @@ int main() {
         int int_bx = (int)bx;
         int int_by = (int)by;
 
-        // if (by == target_col)
-        // {
-        //     by += -1;
-        // }
+        if (((int_by - 2) <= (target_col))
+            && (int_by >= target_col)
+            )
+        {
+            ball_dy *= -1;
+            by -= 0.1f;
+        }
 
         //bound off side of walls rows 0 and 31
         //take into account radius of 2
