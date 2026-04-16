@@ -535,6 +535,8 @@ void check_sd_card_detection(void) {
 int main() {
     stdio_init_all();
 
+    init_sdcard_io();
+
 #if SD_WIRING_TEST
     check_sd_card_detection();
     while (true) {
