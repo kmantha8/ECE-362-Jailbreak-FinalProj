@@ -663,6 +663,31 @@ uint32_t get_boxes(int target_col, uint32_t color, int col, int row, bool box1_e
     return 0;
 }
 
+uint32_t get_score(int col, int row)
+{
+    //score is the width
+    //1 is the height
+    //row should only happen on row 0 or 1
+    //start is col 0
+    //start is row 0
+
+    uint32_t score_y = 0;
+    uint32_t score_x = 0;
+    uint32_t score_height = 2;
+
+    bool score_bool = ((row >= score_y) && 
+                (row < (score_y + score_height)) &&
+                ((col >= score_x) && 
+                (col < (score_x + (int)score)) 
+                ));
+    
+    uint32_t bits_score = score_bool ? 0b111 : 0b000;
+
+    // uint32_t bits_return = bits_ball | bits_paddle;
+
+    return bits_score;
+}
+
 //easier to scan rows so dont have to it in additional functions
 uint32_t get_data(int phys_col, int phys_row) {
     
@@ -681,6 +706,9 @@ uint32_t get_data(int phys_col, int phys_row) {
         top |= get_boxes(box_y_pos[i], color, phys_col, phys_row, box1_on[i], box2_on[i]);
         bottom |= get_boxes(box_y_pos[i], color, phys_col, phys_row + 16, box1_on[i], box2_on[i]);
     }
+
+    top |= get_score(phys_col, phys_row);
+    bottom |= get_score(phys_col, phys_row + 16);
     
     // uint32_t top = top_ball | top_box;
     // uint32_t bottom = bottom_ball | bottom_box;
@@ -759,11 +787,11 @@ const uint32_t game_message[5] = {
 };
 
 const uint32_t over_message[5] = {
-    0b0111010001011110111000, // O  V  E  R
-    0b1000110001100001000100,
-    0b1000101010111101110000,
-    0b1000101010100001000100,
-    0b0111001010111101000100
+    0b01110010001011110111100, // O  V  E  R
+    0b10001010001010000100010,
+    0b10001001010011110111100,
+    0b10001001010010000100010,
+    0b01110000100011110100010
 };
 
 uint32_t game_over(int col, int row)
@@ -784,7 +812,7 @@ uint32_t game_over(int col, int row)
     uint32_t bottom = 0;
 
 
-    int text_start_col = 17;
+    int text_start_col = 19;
     int text_start_row = 5;
 
     //game displayed on top half
@@ -803,12 +831,20 @@ uint32_t game_over(int col, int row)
             //read from left to right
             //EX: 1 << (19 - 0) shift the data over 19 to read that bit
             if (game_message[row - text_start_row] & (1 << (22 - bit_index))) {
-                top = 0b001; // Red
+                top = 0b111; // Red
             }
+            // else 
+            // {
+            //     top = 0b001;
+            // }
 
             if (over_message[row - text_start_row] & (1 << (22 - bit_index))) {
-                bottom = 0b001; // red
+                bottom = 0b111; // red
             }
+            // else 
+            // {
+            //     bottom = 0b001;
+            // }
         }
     }
 
