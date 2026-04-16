@@ -29,11 +29,11 @@
 
 /*******************************************************************/
 
-#define SD_MISO 15
-#define SD_CS 13
-#define SD_SCK 14
-#define SD_MOSI 12
-#define SD_SPI_INSTANCE spi1
+#define SD_MISO 19
+#define SD_CS 17
+#define SD_SCK 18
+#define SD_MOSI 16
+#define SD_SPI_INSTANCE spi0
 
 /*******************************************************************/
 
@@ -439,7 +439,7 @@ int main() {
     init_uart_irq();
     
     init_sdcard_io();
-    
+
     // SD card functions will initialize everything.
     command_shell();
 
