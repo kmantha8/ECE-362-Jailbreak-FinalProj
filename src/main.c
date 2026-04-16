@@ -22,8 +22,8 @@
 #define DATA_BASE_PIN 1 
 #define ADDR_BASE_PIN 7 
 #define CLK_PIN 11
-#define LAT_PIN 16
-#define OE_PIN 17
+#define LAT_PIN 12
+#define OE_PIN 13
 
 
 #define WHITE 0b111111 

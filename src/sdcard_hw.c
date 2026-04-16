@@ -102,36 +102,24 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 
-#include "hardware/resets.h"
-
+// 1. Setup the actual SPI peripheral and Pins
 void init_sdcard_io() {
-    // 1. Reset the SPI1 peripheral to ensure a clean state
-    reset_block(RESETS_RESET_SPI1_BITS);
-    unreset_block_wait(RESETS_RESET_SPI1_BITS);
-
-    // 2. Initialize SPI1 at 400kHz (Standard SD Init Speed)
-    // We call this twice to ensure the peripheral clock is locked
-    spi_init(spi1, 400 * 1000);
+    // 1. Force SPI1 at a slow speed
+    spi_init(spi0, 400 * 1000);
     
-    // 3. FORCE Pin Multiplexing
-    // We must ensure the RP2350 switches these pins from SIO (GPIO) to SPI
-    gpio_set_function(12, GPIO_FUNC_SPI); // MISO
-    gpio_set_function(14, GPIO_FUNC_SPI); // SCK
-    gpio_set_function(15, GPIO_FUNC_SPI); // MOSI
+    // 2. Force the pins to SPI1 functionality
+    // On RP2350, Pins 12-15 are specifically SPI1
+    gpio_set_function(16, GPIO_FUNC_SPI); // MISO
+    gpio_set_function(18, GPIO_FUNC_SPI); // SCK
+    gpio_set_function(19, GPIO_FUNC_SPI); // MOSI
     
-    // 4. Manual Pull-up on MISO
-    // Many SD cards need this to stay out of a floating state
-    gpio_pull_up(12);
+    // 3. Chip Select as standard GPIO
+    gpio_init(17);
+    gpio_set_dir(17, GPIO_OUT);
+    gpio_put(17, 1);
 
-    // 5. CS is handled as a standard GPIO
-    gpio_init(13);
-    gpio_set_dir(13, GPIO_OUT);
-    gpio_put(13, 1); // Keep high (deselected)
-
-    // 6. Explicitly set the SPI format
-    spi_set_format(spi1, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
-    
-    printf("SPI1 Hardware Initialized on Pins 12-15\n");
+    // 4. Set format
+    spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
 }
 
 // 2. Speed up after the card is ready
