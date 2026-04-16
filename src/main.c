@@ -532,6 +532,8 @@ int target_col = 63;
 uint32_t count = 0;
 uint32_t color = 0b111111;
 
+bool lose_end = false;
+
 void setup_pio(PIO pio, uint sm, uint offset) {
     //lead default configuration for led matrix
     pio_sm_config c = matrix_pio_program_get_default_config(offset);
@@ -683,7 +685,8 @@ int main() {
 
             if (target_col == 0)
             {
-                target_col = 63;
+                // target_col = 63;
+                lose_end = true;
             }
         }
         //ball physics
@@ -739,10 +742,11 @@ int main() {
 
         if (int_by < (paddle_y))
         {
-            bx = 16.0f;
-            by = 32.0f; // Centered vertically'
-            ball_dx = -0.1f; //horixonal speed
-            ball_dy = 0.15f; //verifucal speed
+            // bx = 16.0f;
+            // by = 32.0f; // Centered vertically'
+            // ball_dx = -0.1f; //horixonal speed
+            // ball_dy = 0.15f; //verifucal speed
+            lose_end = true;
         }
 
         for (int row = 0; row < 16; row++) {
@@ -766,6 +770,11 @@ int main() {
 
                     //find mask with added line
                     mask |= line;
+
+                    if (lose_end)
+                    {
+                        mask = 0b001001;
+                    }
                     
                     //ensure mask is only 6 bits
                     //having trouble lining up the ball and paddle
