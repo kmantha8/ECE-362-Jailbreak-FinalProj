@@ -1,22 +1,509 @@
+////////////////////////////////////////////////////////
+// ALL WHITE
+/////////////////////////////////////////////////////
+// #include <stdio.h>
+// #include "pico/stdlib.h"
+// #include "hardware/pio.h"
+// #include "matrix.pio.h"
+
+// #define DATA_BASE_PIN 1 
+// #define CLK_PIN 11
+// #define LAT_PIN 12
+// #define OE_PIN 13
+// #define ADDR_BASE_PIN 7 
+
+// void setup_pio(PIO pio, uint sm, uint offset) {
+//     pio_sm_config c = matrix_pio_program_get_default_config(offset);
+    
+//     sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+//     sm_config_set_sideset_pins(&c, CLK_PIN);
+
+//     for(int i=0; i<6; i++) pio_gpio_init(pio, DATA_BASE_PIN + i);
+//     pio_gpio_init(pio, CLK_PIN);
+
+//     pio_sm_set_consecutive_pindirs(pio, sm, DATA_BASE_PIN, 6, true);
+//     pio_sm_set_consecutive_pindirs(pio, sm, CLK_PIN, 1, true);
+
+//     // SHIFT RIGHT: This is the standard for Pico PIO.
+//     // Autopull at 30 bits (5 pixels * 6 bits). 
+//     // This uses bits 0-29 of your 32-bit word.
+//     sm_config_set_out_shift(&c, true, true, 30); 
+
+//     // Slow clock for high-capacitance matrix cables
+//     sm_config_set_clkdiv(&c, 50.0f); 
+
+//     pio_sm_init(pio, sm, offset, &c);
+//     pio_sm_set_enabled(pio, sm, true);
+// }
+
+// int main() {
+//     stdio_init_all();
+
+//     for(int i=7; i<=13; i++) {
+//         gpio_init(i);
+//         gpio_set_dir(i, GPIO_OUT);
+//     }
+
+//     PIO pio = pio0;
+//     uint offset = pio_add_program(pio, &matrix_pio_program);
+//     uint sm = pio_claim_unused_sm(pio, true);
+//     setup_pio(pio, sm, offset);
+
+//     while (true) {
+//         for (int row = 0; row < 16; row++) {
+//             // 1. Prepare for data
+//             gpio_put(OE_PIN, 1); 
+
+//             // 2. Set Row Address
+//             gpio_put_masked(0xF << ADDR_BASE_PIN, row << ADDR_BASE_PIN);
+
+//             // 3. Fill the row
+//             // We need 64 pixels. 64 pixels / 5 per word = 12.8 words.
+//             // We will send 13 words to ensure the row is full.
+//             // 0x3FFFFFFF = Binary 0011 1111... (30 ones)
+//             for (int i = 0; i < 13; i++) {
+//                 pio_sm_put_blocking(pio, sm, 0x3FFFFFFF);
+//             }
+
+//             // 4. THE CRITICAL SYNC: 
+//             // Wait for the FIFO to empty AND the OSR (Output Shift Register) to empty
+//             while (!pio_sm_is_tx_fifo_empty(pio, sm));
+            
+//             // This is the "Reset Fix": Clear anything stuck in the shifter
+//             // by forcing a state machine restart if it hangs
+//             busy_wait_us(10); 
+
+//             // 5. Latch and Show
+//             gpio_put(LAT_PIN, 1);
+//             busy_wait_us(2);
+//             gpio_put(LAT_PIN, 0);
+            
+//             gpio_put(OE_PIN, 0);
+//             busy_wait_us(400); 
+//         }
+//     }
+// }
+
+// /////////////////////////////////////////////////
+// ALTERNATE RED / GREEN LEDS
+////////////////////////////////////////////////
+// #include <stdio.h>
+// #include "pico/stdlib.h"
+// #include "hardware/pio.h"
+// #include "matrix.pio.h"
+
+// // --- Configuration ---
+// #define DATA_BASE_PIN 1  // R1, G1, B1, R2, G2, B2 (Pins 1-6)
+// #define ADDR_BASE_PIN 7  // A, B, C, D (Pins 7-10)
+// #define CLK_PIN 11
+// #define LAT_PIN 12
+// #define OE_PIN 13
+
+// void setup_pio(PIO pio, uint sm, uint offset) {
+//     pio_sm_config c = matrix_pio_program_get_default_config(offset);
+    
+//     // Map the 'out' pins for data and 'side-set' for the clock
+//     sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+//     sm_config_set_sideset_pins(&c, CLK_PIN);
+
+//     // Initialize the GPIOs for PIO use
+//     for(int i=0; i<6; i++) pio_gpio_init(pio, DATA_BASE_PIN + i);
+//     pio_gpio_init(pio, CLK_PIN);
+
+//     pio_sm_set_consecutive_pindirs(pio, sm, DATA_BASE_PIN, 6, true);
+//     pio_sm_set_consecutive_pindirs(pio, sm, CLK_PIN, 1, true);
+
+//     // Shift Right, Autopull at 24 bits (6 bits * 4 pixels = 24 bits)
+//     sm_config_set_out_shift(&c, true, true, 24); 
+
+//     // Clock divider: 20.0f is a good balance of speed and stability
+//     sm_config_set_clkdiv(&c, 20.0f); 
+
+//     pio_sm_init(pio, sm, offset, &c);
+//     pio_sm_set_enabled(pio, sm, true);
+// }
+
+// int main() {
+//     stdio_init_all();
+
+//     // Initialize Address and Control pins as standard GPIO
+//     for(int i=7; i<=13; i++) {
+//         gpio_init(i);
+//         gpio_set_dir(i, GPIO_OUT);
+//     }
+
+//     // PIO Setup
+//     PIO pio = pio0;
+//     uint offset = pio_add_program(pio, &matrix_pio_program);
+//     uint sm = pio_claim_unused_sm(pio, true);
+//     setup_pio(pio, sm, offset);
+
+//     while (true) {
+//         for (int row = 0; row < 16; row++) {
+//             // 1. Disable display while shifting new data
+//             gpio_put(OE_PIN, 1); 
+
+//             // 2. Set Row Address (A, B, C, D)
+//             gpio_put_masked(0xF << ADDR_BASE_PIN, row << ADDR_BASE_PIN);
+
+//             // 3. Define the colors for this specific row
+//             uint32_t p_bits;
+//             if (row % 2 == 0) {
+//                 // Even Rows: Red (R1 is bit 0, R2 is bit 3)
+//                 p_bits = 0b001001; // 0x09
+//             } else {
+//                 // Odd Rows: Green (G1 is bit 1, G2 is bit 4)
+//                 p_bits = 0b010010; // 0x12
+//             }
+
+//             // Pack 4 pixels into one 32-bit word (4 * 6 bits = 24 bits used)
+//             uint32_t packed_word = (p_bits << 0) | (p_bits << 6) | (p_bits << 12) | (p_bits << 18);
+
+//             // 4. Send 64 pixels worth of data
+//             // 64 pixels / 4 pixels per word = 16 words
+//             for (int i = 0; i < 16; i++) {
+//                 pio_sm_put_blocking(pio, sm, packed_word);
+//             }
+
+//             // 5. Wait for the PIO hardware to finish the physical shift
+//             while (!pio_sm_is_tx_fifo_empty(pio, sm));
+//             busy_wait_us(2); // Safety buffer for the final clock pulse
+
+//             // 6. Latch the data into the row's shift registers
+//             gpio_put(LAT_PIN, 1);
+//             busy_wait_us(1); 
+//             gpio_put(LAT_PIN, 0);
+            
+//             // 7. Re-enable display and wait (Glow time)
+//             gpio_put(OE_PIN, 0);
+//             busy_wait_us(500); 
+//         }
+//     }
+// }
+
+
+///////////////////////////////////////////////////
+// TRANSITION red -> green -> blue
+// ////////////////////////////////////////////////
+// #include <stdio.h>
+// #include "pico/stdlib.h"
+// #include "hardware/pio.h"
+// #include "matrix.pio.h"
+
+// #define DATA_BASE_PIN 1  
+// #define ADDR_BASE_PIN 7  
+// #define CLK_PIN 11
+// #define LAT_PIN 12
+// #define OE_PIN 13
+
+// void setup_pio(PIO pio, uint sm, uint offset) {
+//     pio_sm_config c = matrix_pio_program_get_default_config(offset);
+//     sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+//     sm_config_set_sideset_pins(&c, CLK_PIN);
+
+//     for(int i=0; i<6; i++) pio_gpio_init(pio, DATA_BASE_PIN + i);
+//     pio_gpio_init(pio, CLK_PIN);
+
+//     pio_sm_set_consecutive_pindirs(pio, sm, DATA_BASE_PIN, 6, true);
+//     pio_sm_set_consecutive_pindirs(pio, sm, CLK_PIN, 1, true);
+
+//     // TRY SHIFT LEFT (false) instead of RIGHT (true)
+//     // Sometimes the way the FIFO handles the 32-bit word requires a Left shift
+//     sm_config_set_out_shift(&c, false, true, 6); 
+
+//     sm_config_set_clkdiv(&c, 50.0f); // Even slower for testing
+//     pio_sm_init(pio, sm, offset, &c);
+//     pio_sm_set_enabled(pio, sm, true);
+// }
+
+// int main() {
+//     stdio_init_all();
+//     for(int i=7; i<=13; i++) {
+//         gpio_init(i);
+//         gpio_set_dir(i, GPIO_OUT);
+//     }
+
+//     PIO pio = pio0;
+//     uint offset = pio_add_program(pio, &matrix_pio_program);
+//     uint sm = pio_claim_unused_sm(pio, true);
+//     setup_pio(pio, sm, offset);
+
+//     uint32_t test_colors[] = {
+//         0b001001, // Should be RED (Pins 1 & 4)
+//         0b010010, // Should be GREEN (Pins 2 & 5)
+//         0b100100  // Should be BLUE (Pins 3 & 6)
+//     };
+//     int color_index = 0;
+//     uint32_t last_switch = to_ms_since_boot(get_absolute_time());
+
+//     while (true) {
+//         // Switch color every 1000ms
+//         if (to_ms_since_boot(get_absolute_time()) - last_switch > 1000) {
+//             color_index = (color_index + 1) % 3;
+//             last_switch = to_ms_since_boot(get_absolute_time());
+//         }
+
+//         for (int row = 0; row < 16; row++) {
+//             gpio_put(OE_PIN, 1); 
+//             gpio_put_masked(0xF << ADDR_BASE_PIN, row << ADDR_BASE_PIN);
+
+//             for (int col = 0; col < 64; col++) {
+//                 // We shift the color to the MSB (top of the 32-bit word) 
+//                 // because we are using SHIFT LEFT in the config above.
+//                 pio_sm_put_blocking(pio, sm, test_colors[color_index] << 26);
+//             }
+
+//             while (!pio_sm_is_tx_fifo_empty(pio, sm));
+//             busy_wait_us(2); 
+//             gpio_put(LAT_PIN, 1);
+//             busy_wait_us(1); 
+//             gpio_put(LAT_PIN, 0);
+//             gpio_put(OE_PIN, 0);
+//             busy_wait_us(400); 
+//         }
+//     }
+// }
+
+///////////////////////////////////////////////////
+// RED & GREEN STRIPES
+////////////////////////////////////////////////////
+// #include <stdio.h>
+// #include "pico/stdlib.h"
+// #include "hardware/pio.h"
+// #include "matrix.pio.h"
+
+// #define DATA_BASE_PIN 1 
+// #define ADDR_BASE_PIN 7 
+// #define CLK_PIN 11
+// #define LAT_PIN 12
+// #define OE_PIN 13
+
+// void setup_pio(PIO pio, uint sm, uint offset) {
+//     pio_sm_config c = matrix_pio_program_get_default_config(offset);
+//     sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+//     sm_config_set_sideset_pins(&c, CLK_PIN);
+
+//     for(int i=0; i<6; i++) pio_gpio_init(pio, DATA_BASE_PIN + i);
+//     pio_gpio_init(pio, CLK_PIN);
+
+//     pio_sm_set_consecutive_pindirs(pio, sm, DATA_BASE_PIN, 6, true);
+//     pio_sm_set_consecutive_pindirs(pio, sm, CLK_PIN, 1, true);
+
+//     // Using your working 24-bit pull threshold
+//     sm_config_set_out_shift(&c, true, true, 24); 
+    
+//     // Slowing down to 30.0f to ensure the Red signals have time to rise
+//     sm_config_set_clkdiv(&c, 30.0f); 
+
+//     pio_sm_init(pio, sm, offset, &c);
+//     pio_sm_set_enabled(pio, sm, true);
+// }
+
+// int main() {
+//     stdio_init_all();
+
+//     for(int i=7; i<=13; i++) {
+//         gpio_init(i);
+//         gpio_set_dir(i, GPIO_OUT);
+//         gpio_set_drive_strength(i, GPIO_DRIVE_STRENGTH_12MA);
+//     }
+
+//     PIO pio = pio0;
+//     uint offset = pio_add_program(pio, &matrix_pio_program);
+//     uint sm = pio_claim_unused_sm(pio, true);
+//     setup_pio(pio, sm, offset);
+
+//     // Explicitly define the 6-bit masks
+//     const uint32_t RED   = 0b001001; // R1 and R2
+//     const uint32_t GREEN = 0b010010; // G1 and G2
+
+//     while (true) {
+//         for (int row = 0; row < 16; row++) {
+//             // 1. OE High (Display Off)
+//             gpio_put(OE_PIN, 1); 
+
+//             // 2. Set Address
+//             gpio_put_masked(0xF << ADDR_BASE_PIN, row << ADDR_BASE_PIN);
+
+//             // 3. Build the alternating 24-bit word
+//             // This creates: [Green][Red][Green][Red] (4 pixels total)
+//             uint32_t stripe_word = 0;
+//             stripe_word |= (RED   << 0);
+//             stripe_word |= (GREEN << 6);
+//             stripe_word |= (RED   << 12);
+//             stripe_word |= (GREEN << 18);
+//             // Ensure bits 24-31 are strictly 0
+//             stripe_word &= 0x00FFFFFF;
+
+//             // 4. Push data (16 words * 4 pixels/word = 64 pixels)
+//             for (int i = 0; i < 16; i++) {
+//                 pio_sm_put_blocking(pio, sm, stripe_word);
+//             }
+
+//             // 5. Hardware Sync
+//             while (!pio_sm_is_tx_fifo_empty(pio, sm));
+//             busy_wait_us(5); // Increased wait for the slow RP2350 -> Panel link
+
+//             // 6. Latch
+//             gpio_put(LAT_PIN, 1);
+//             busy_wait_us(2); 
+//             gpio_put(LAT_PIN, 0);
+            
+//             // 7. OE Low (Display On)
+//             gpio_put(OE_PIN, 0);
+//             busy_wait_us(400); 
+//         }
+//     }
+// }
+
+
+//////////////////////////////////////////////////////////
+// WHITE CIRCLE
+// // // /////////////////////////////////////////////////////////
+// #include <stdio.h>
+// #include "pico/stdlib.h"
+// #include "hardware/pio.h"
+// #include "hardware/gpio.h"
+// #include "matrix.pio.h"
+
+// //Pin mapping
+// #define DATA_BASE_PIN 1 
+// #define ADDR_BASE_PIN 7 
+// #define CLK_PIN 11
+// #define LAT_PIN 12
+// #define OE_PIN 13
+
+// #define WHITE 0b111111 
+// #define BLACK 0b000000
+
+// void setup_pio(PIO pio, uint sm, uint offset) {
+//     //lead default configuration for led matrix
+//     pio_sm_config c = matrix_pio_program_get_default_config(offset);
+//     //define 6 data pins as out for RGB data
+//     sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+//     //define clk find as the side-set pins to toggle automattically
+//     sm_config_set_sideset_pins(&c, CLK_PIN);
+    
+//     //initlaize gpio for pio use
+//     for (int i = 0; i < 6; i++) 
+//     {
+//         pio_gpio_init(pio, DATA_BASE_PIN + i);
+//     }
+//     pio_gpio_init(pio, CLK_PIN);
+    
+//     //set direction of pin to output in statemachine
+//     pio_sm_set_consecutive_pindirs(pio, sm, DATA_BASE_PIN, 6, true);
+//     pio_sm_set_consecutive_pindirs(pio, sm, CLK_PIN, 1, true);
+    
+//     //shift out 24 bits at a time, shift right
+//     // 24-bit packing (4 pixels * 6 bits)
+//     sm_config_set_out_shift(&c, true, true, 24); 
+//     //set clk divider
+//     sm_config_set_clkdiv(&c, 20.0f); 
+    
+//     //apply configuration and enable state machien
+//     pio_sm_init(pio, sm, offset, &c);
+//     pio_sm_set_enabled(pio, sm, true);
+// }
+
+// uint32_t get_clean_circle(int x, int row) {
+//     //center of circles x and y
+//     int cx = 32;
+//     int cy = 16;
+//     //easier calcuation (12^2)
+//     int radius_sq = 144;
+
+//     //calculate distance fro top half (rows 0-15)
+//     int dx = x - cx;
+//     int dy1 = row - cy;
+//     int dist1 = (dx * dx) + (dy1 * dy1);
+//     //if distance < radius 
+//     //set rbg to white or else black
+//     uint32_t top = (dist1 < radius_sq) ? 0b111 : 0b000;
+
+//     //calculate distance fro top half (rows 16-31)
+//     int dy2 = (row + 16) - cy;
+//     int dist2 = (dx * dx) + (dy2 * dy2);
+//     //same thing
+//     uint32_t bottom = (dist2 < radius_sq) ? 0b111 : 0b000;
+
+//     //combine bottom (upper 3 bits) and top (lower 3 bits)
+//     //into 6-bit pixal data
+//     return (bottom << 3) | top;
+// }
+
+
+
+// int main() {
+//     stdio_init_all();
+
+//     for(int i = 7; i <= 13; i++) {
+//         //set adress pins
+//         gpio_init(i);
+//         //set as output
+//         gpio_set_dir(i, GPIO_OUT);
+//         //high current for LEDS
+//         gpio_set_drive_strength(i, GPIO_DRIVE_STRENGTH_12MA);
+//     }
+
+//     //use first PIO block
+//     PIO pio = pio0;
+//     //load asm into pio memory
+//     uint offset = pio_add_program(pio, &matrix_pio_program);
+//     //find an aviable state machine
+//     uint sm = pio_claim_unused_sm(pio, true);
+//     //run conifguration
+//     setup_pio(pio, sm, offset);
+
+//     while (true) {
+//         for (int row = 0; row < 16; row++) {
+//             //disable display to prevent ghosting while swittching rows
+//             gpio_put(OE_PIN, 1); 
+
+//             // Set Address Pins (A, B, C, D)
+//             //to select row
+//             gpio_put_masked(0xF << ADDR_BASE_PIN, row << ADDR_BASE_PIN);
+
+//             // Shift in 64 pixels (16 words of 4 pixels)
+//             for (int i = 0; i < 16; i++) {
+//                 uint32_t packed_word = 0;
+//                 for (int p = 0; p < 4; p++) {
+//                     int col = (i * 4) + p;
+//                     //get color for the specific coordinate
+//                     uint32_t mask = get_clean_circle(col, row);
+//                     //pack 6-bit color into 32-bit word for PIO
+//                     packed_word |= (mask << (p * 6));
+//                 }
+//                 //send 4-pixel workd to pio fifo
+//                 pio_sm_put_blocking(pio, sm, packed_word);
+//             }
+
+//             //wait for shifting in the bits
+//             while (!pio_sm_is_tx_fifo_empty(pio, sm));
+            
+//             //puslse the latch to move shifted data to led driver
+//             gpio_put(LAT_PIN, 1);
+//             busy_wait_us(1); 
+//             gpio_put(LAT_PIN, 0);
+            
+//             //enable display and wait so leds hvae time to light up
+//             gpio_put(OE_PIN, 0);
+//             busy_wait_us(200); 
+//         }
+//     }
+// }
+
+
 ///////////////////////////////////////////////////
 // Ball and paddle
 //////////////////////////////////////////////
 
 #include <stdio.h>
-#include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
 #include "highscore.h"
 #include "matrix.pio.h"
-#include "ff.h"      // FatFs header
-#include "diskio.h"  // SD card interface functions
-#include "sdcard_hw.h"
-#include "hardware/spi.h"
-
-#ifndef SD_WIRING_TEST
-#define SD_WIRING_TEST 0
-#endif
 
 //Pin mapping
 #define DATA_BASE_PIN 1 
@@ -24,7 +511,6 @@
 #define CLK_PIN 11
 #define LAT_PIN 12
 #define OE_PIN 13
-
 
 #define WHITE 0b111111 
 #define BLACK 0b000000
@@ -431,124 +917,13 @@ uint32_t game_over(int col, int row)
     return (bottom << 3) | top;
 }
 
-static const char *fatfs_result_string(FRESULT result) {
-    switch (result) {
-    case FR_OK:
-        return "OK";
-    case FR_DISK_ERR:
-        return "Low-level disk error";
-    case FR_NOT_READY:
-        return "Drive not ready";
-    case FR_NO_FILE:
-        return "File not found";
-    case FR_INVALID_NAME:
-        return "Invalid name";
-    case FR_DENIED:
-        return "Access denied";
-    case FR_WRITE_PROTECTED:
-        return "Write protected";
-    case FR_NOT_ENABLED:
-        return "No work area";
-    case FR_NO_FILESYSTEM:
-        return "No FAT filesystem";
-    case FR_TIMEOUT:
-        return "Timeout";
-    case FR_INVALID_PARAMETER:
-        return "Invalid parameter";
-    default:
-        return "Other FatFs error";
-    }
-}
-
-void check_sd_card_detection(void) {
-    static const char test_text[] = "sd wiring ok\r\n";
-    FATFS fs;
-    FIL file;
-    FRESULT res;
-    DSTATUS status;
-    UINT transferred = 0;
-    char readback[sizeof(test_text)] = {0};
-
-    sleep_ms(2000);
-    printf("\r\nSD wiring test\r\n");
-    printf("Pins: MISO=%d CS=%d SCK=%d MOSI=%d\r\n",
-           SD_MISO_PIN, SD_CS_PIN, SD_SCK_PIN, SD_MOSI_PIN);
-
-    status = disk_initialize(0);
-    printf("disk_initialize(0) -> 0x%02x\r\n", status);
-    if (status != 0) {
-        printf("Low-level init failed.\r\n");
-        printf("Check MOSI/MISO/SCK/CS, SD power, ground, and the 10k pull-up on MISO.\r\n");
-        return;
-    }
-
-    status = disk_status(0);
-    printf("disk_status(0) -> 0x%02x\r\n", status);
-
-    res = f_mount(&fs, "", 1);
-    printf("f_mount -> %d (%s)\r\n", res, fatfs_result_string(res));
-    if (res != FR_OK) {
-        if (res == FR_NO_FILESYSTEM) {
-            printf("The card responded, but it is not formatted as FAT/FAT32.\r\n");
-        }
-        return;
-    }
-
-    res = f_open(&file, "SDTEST.TXT", FA_WRITE | FA_CREATE_ALWAYS);
-    printf("f_open(write) -> %d (%s)\r\n", res, fatfs_result_string(res));
-    if (res != FR_OK) {
-        f_mount(NULL, "", 0);
-        return;
-    }
-
-    res = f_write(&file, test_text, (UINT)(sizeof(test_text) - 1), &transferred);
-    printf("f_write -> %d (%s), bytes=%u\r\n",
-           res, fatfs_result_string(res), transferred);
-    f_sync(&file);
-    f_close(&file);
-    if (res != FR_OK || transferred != (UINT)(sizeof(test_text) - 1)) {
-        f_mount(NULL, "", 0);
-        return;
-    }
-
-    res = f_open(&file, "SDTEST.TXT", FA_READ);
-    printf("f_open(read) -> %d (%s)\r\n", res, fatfs_result_string(res));
-    if (res != FR_OK) {
-        f_mount(NULL, "", 0);
-        return;
-    }
-
-    res = f_read(&file, readback, (UINT)(sizeof(readback) - 1), &transferred);
-    f_close(&file);
-    printf("f_read -> %d (%s), bytes=%u\r\n",
-           res, fatfs_result_string(res), transferred);
-    printf("readback: %s", readback);
-
-    if (res == FR_OK && strcmp(readback, test_text) == 0) {
-        printf("SD wiring test passed.\r\n");
-    } else {
-        printf("Readback mismatch. The SPI link may be unstable.\r\n");
-    }
-
-    f_mount(NULL, "", 0);
-}
-
 int main() {
     stdio_init_all();
-
-    init_sdcard_io();
-
-#if SD_WIRING_TEST
-    check_sd_card_detection();
-    while (true) {
-        sleep_ms(1000);
-    }
-#endif
 
     //call button function
     init_inputs();
 
-    for(int i = 7; i <= 11; i++) {
+    for(int i = 7; i <= 13; i++) {
         //set adress pins
         gpio_init(i);
         //set as output
@@ -556,20 +931,6 @@ int main() {
         //high current for LEDS
         gpio_set_drive_strength(i, GPIO_DRIVE_STRENGTH_12MA);
     }
-
-    //set adress pins
-    gpio_init(16);
-    //set as output
-    gpio_set_dir(16, GPIO_OUT);
-    //high current for LEDS
-    gpio_set_drive_strength(16, GPIO_DRIVE_STRENGTH_12MA);
-    
-    //set adress pins
-    gpio_init(17);
-    //set as output
-    gpio_set_dir(17, GPIO_OUT);
-    //high current for LEDS
-    gpio_set_drive_strength(17, GPIO_DRIVE_STRENGTH_12MA);
 
     //use first PIO block
     PIO pio = pio0;
@@ -804,46 +1165,4 @@ int main() {
 }
 
 
-// #include <stdio.h>
-// #include "pico/stdlib.h"
-
-// int main() {
-//     stdio_init_all();
-//     sleep_ms(2000); // Give serial monitor time to connect
-
-//     const uint mosi_pin = 15;
-//     const uint miso_pin = 12;
-
-//     gpio_init(mosi_pin);
-//     gpio_set_dir(mosi_pin, GPIO_OUT);
-    
-//     gpio_init(miso_pin);
-//     gpio_set_dir(miso_pin, GPIO_IN);
-//     gpio_pull_down(miso_pin); // Ensure it stays LOW unless pushed HIGH
-
-//     printf("Starting Manual Pin Check on GP15 -> GP12...\n");
-
-//     while (true) {
-//         // Set MOSI HIGH
-//         gpio_put(mosi_pin, 1);
-//         sleep_ms(10);
-//         bool test_high = gpio_get(miso_pin);
-
-//         // Set MOSI LOW
-//         gpio_put(mosi_pin, 0);
-//         sleep_ms(10);
-//         bool test_low = gpio_get(miso_pin);
-
-//         printf("MOSI HIGH -> MISO reads: %s\n", test_high ? "PASS (1)" : "FAIL (0)");
-//         printf("MOSI LOW  -> MISO reads: %s\n", !test_low ? "PASS (0)" : "FAIL (1)");
-        
-//         if (test_high && !test_low) {
-//             printf("RESULT: PINS ARE ELECTRICALLY OK!\n");
-//         } else {
-//             printf("RESULT: HARDWARE FAULT OR WRONG PINS!\n");
-//         }
-        
-//         sleep_ms(2000);
-//     }
-// }
 

@@ -1,4 +1,3 @@
-
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "ff.h"			/* Obtains integer types */
@@ -10,18 +9,18 @@ static spi_inst_t *sd = SD_SPI_INSTANCE; // the SPI interface to use for the SD 
 
 // Weak definitions for the functions that must be implemented elsewhere
 // to allow the SPI interface for the SD card to work.
-// __attribute((weak)) void init_sdcard_io() {
-//     puts("init_sdcard_io() not implemented.");
-// }
-// __attribute((weak)) void sdcard_io_high_speed(void) {
-//     puts("sdcard_io_high_speed() not implemented.");
-// }
-// __attribute((weak)) void enable_sdcard(void) {
-//     puts("enable_sdcard() not implemented.");
-// }
-// __attribute((weak)) void disable_sdcard(void) {
-//     puts("disable_sdcard() not implemented.");
-// }
+__attribute((weak)) void init_sdcard_io() {
+    puts("init_sdcard_io() not implemented.");
+}
+__attribute((weak)) void sdcard_io_high_speed(void) {
+    puts("sdcard_io_high_speed() not implemented.");
+}
+__attribute((weak)) void enable_sdcard(void) {
+    puts("enable_sdcard() not implemented.");
+}
+__attribute((weak)) void disable_sdcard(void) {
+    puts("disable_sdcard() not implemented.");
+}
 
 // Make sure the receive FIFO of the SPI interface is clear.
 void spi_clear_rxfifo(spi_inst_t *s) {
@@ -49,15 +48,9 @@ uint8_t sdcard_write(uint8_t b)
 
 // Write 10 bytes of 0xff (80 bits total) to initialize the SD card
 // into legacy SPI mode.
-// void sdcard_init_clock()
-// {
-//     for(int i=0; i<10; i++)
-//         sdcard_write(0xff);
-// }
-
-void sdcard_init_clock() {
-    // Increase this from 10 to 20 or 50 to give the card plenty of time to wake up
-    for(int i=0; i<20; i++)
+void sdcard_init_clock()
+{
+    for(int i=0; i<10; i++)
         sdcard_write(0xff);
 }
 
@@ -163,8 +156,6 @@ DSTATUS disk_initialize (
     spi_clear_rxfifo(sd);
     enable_sdcard();
     value = sdcard_cmd(0, 0x00000000, 0x95); // Go to idle state
-
-    printf("Handshake CMD0 Response: 0x%02X (Attempt %d)\n", value, count);
     if (value != 1)
         goto restart;
     disable_sdcard();
