@@ -29,26 +29,26 @@
 
 /*******************************************************************/
 
-#define SD_MISO 19
+#define SD_MISO 16
 #define SD_CS 17
 #define SD_SCK 18
-#define SD_MOSI 16
+#define SD_MOSI 19
 #define SD_SPI_INSTANCE spi0
 
 /*******************************************************************/
 
 void init_spi_sdcard() {
-    // 1. Configure SCK, MOSI, MISO as SPI pins
+    //Configure SCK, MOSI, MISO as SPI pins
     gpio_set_function(SD_SCK, GPIO_FUNC_SPI);
     gpio_set_function(SD_MOSI, GPIO_FUNC_SPI);
     gpio_set_function(SD_MISO, GPIO_FUNC_SPI);
 
-    // 2. Configure CS as a regular GPIO pin controlled by SIO
+    //Configure CS as a regular GPIO pin controlled by SIO
     gpio_init(SD_CS);
     gpio_set_dir(SD_CS, GPIO_OUT);
     gpio_put(SD_CS, 1); // Set CS high (inactive initially)
 
-    // 3. Configure the SPI peripheral (SPI1)
+    // Configure the SPI peripheral (SPI1)
     // 400 KHz baudrate, 8-bit, CPOL=0, CPHA=0
     spi_init(SD_SPI_INSTANCE, 400 * 1000);
     spi_set_format(SD_SPI_INSTANCE, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
@@ -462,7 +462,7 @@ int main() {
     setup_pio(pio, sm, offset);
 
     while (true) {
-
+     
         //BUTTON LOGIC
         //want to have it so one button press
         //moves it one pixel
