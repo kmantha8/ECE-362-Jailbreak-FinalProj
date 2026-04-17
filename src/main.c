@@ -64,17 +64,18 @@ void disable_sdcard() {
 
     // Release MOSI: Make it a GPIO and force it high
     gpio_init(SD_MOSI);
+    gpio_set_function(SD_MOSI, GPIO_FUNC_SIO);
     gpio_set_dir(SD_MOSI, GPIO_OUT);
     gpio_put(SD_MOSI, 1);
 }
 
 void enable_sdcard() {
-    //try swithcing around
     // Take control of MOSI again by making it an SPI pin
     gpio_set_function(SD_MOSI, GPIO_FUNC_SPI);
 
     // Set CS low (active)
     gpio_put(SD_CS, 0);
+    //try swithcing around
 }
 
 void sdcard_io_high_speed() {
