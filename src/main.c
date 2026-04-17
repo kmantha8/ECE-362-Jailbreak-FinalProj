@@ -69,6 +69,7 @@ void disable_sdcard() {
 }
 
 void enable_sdcard() {
+    //try swithcing around
     // Take control of MOSI again by making it an SPI pin
     gpio_set_function(SD_MOSI, GPIO_FUNC_SPI);
 
